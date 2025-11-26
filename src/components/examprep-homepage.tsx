@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import Link from 'next/link'
 
 export default function ExamPrepHomepage () {
 	const [selectedCategory, setSelectedCategory] = useState('all')
@@ -201,12 +202,14 @@ export default function ExamPrepHomepage () {
 										<div className="flex items-start justify-between mb-3">
 											<div>
 												<div className="flex items-center gap-2 mb-1">
-													<span className="font-bold text-lg text-blue-600">{exam.code}</span>
+													<Link href={`/exams/${exam.code}`} className="font-bold text-lg text-blue-600 hover:underline">{exam.code}</Link>
 													{exam.hot && (
 														<span className="bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs px-2 py-0.5 rounded-full font-medium">🔥 Hot</span>
 													)}
 												</div>
-												<h3 className="font-semibold text-slate-800 group-hover:text-blue-600 transition-colors leading-tight">{exam.name}</h3>
+												<Link href={`/exams/${exam.code}`}>
+													<h3 className="font-semibold text-slate-800 group-hover:text-blue-600 transition-colors leading-tight">{exam.name}</h3>
+												</Link>
 											</div>
 										</div>
 
@@ -233,9 +236,9 @@ export default function ExamPrepHomepage () {
 
 										<div className="flex gap-2">
 											<button className="flex-1 bg-slate-100 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-200 transition-all">Preview</button>
-											<button className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:shadow-lg transition-all">
+											<Link href={`/exams/${exam.code}`} className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:shadow-lg transition-all text-center">
 												View Exam
-											</button>
+											</Link>
 										</div>
 									</div>
 								</div>

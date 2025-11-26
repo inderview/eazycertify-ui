@@ -3,6 +3,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Tabs } from '@/components/admin/Tabs'
 import { Card } from '@/components/admin/Card'
+import { RichTextEditor } from '@/components/admin/RichTextEditor'
+import { HotspotQuestion } from '@/components/questions/hotspot-question'
+import { MultipleChoiceQuestion } from '@/components/questions/multiple-choice-question'
+import { YesNoQuestion } from '@/components/questions/yesno-question'
+
+
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001/api'
 
@@ -61,8 +67,10 @@ export default function QuestionsPage () {
       fetch(`${API_BASE}/admin/exams`, { headers: { Authorization: `Bearer ${token}` } }),
       fetch(`${API_BASE}/admin/blocks`, { headers: { Authorization: `Bearer ${token}` } }),
     ])
+    
+    const examsData = await examRes.json()
     setProviders(await provRes.json())
-    setExams(await examRes.json())
+    setExams(Array.isArray(examsData) ? examsData : [])
     setBlocks(await blockRes.json())
   }
 
@@ -86,23 +94,27 @@ export default function QuestionsPage () {
     e.preventDefault()
     setError(null)
     if (!form.examId) return setError('Select Exam')
-    const payload = {
+    const payload: any = {
       ...form,
       examId: Number(form.examId),
       blockId: form.blockId ? Number(form.blockId) : undefined,
-      options: (form.type === 'hotspot' || form.type === 'dragdrop')
+      options: (form.type === 'hotspot' || form.type === 'dragdrop' || form.type === 'yesno')
         ? []
         : form.options.map((o, i) => ({
             text: o.text,
             isCorrect: form.type === 'ordering' ? true : o.isCorrect,
             optionOrder: i + 1,
           })),
-      groups: (form.type === 'hotspot' || form.type === 'dragdrop') ? form.groups.map((g, gi) => ({
+    }
+    
+    // Only include groups if type is hotspot or dragdrop or yesno
+    if (form.type === 'hotspot' || form.type === 'dragdrop' || form.type === 'yesno') {
+      payload.groups = form.groups.map((g, gi) => ({
         label: g.label,
         mode: g.mode,
         groupOrder: gi + 1,
         options: g.options.map((o, i) => ({ ...o, optionOrder: i + 1 })),
-      })) : undefined,
+      }))
     }
     const res = await fetch(`${API_BASE}/admin/questions${editingId ? `/${editingId}` : ''}`, {
       method: editingId ? 'PUT' : 'POST',
@@ -307,13 +319,22 @@ export default function QuestionsPage () {
 
             <div className="md:col-span-6 flex flex-col gap-1">
               <label className="text-xs font-medium">Question Text (rich)</label>
-              <textarea rows={5} className="rounded-md border px-3 py-2 text-sm" value={form.text} onChange={e => setForm(prev => ({ ...prev, text: e.target.value }))} />
+              <RichTextEditor 
+                value={form.text} 
+                onChange={val => setForm(prev => ({ ...prev, text: val }))} 
+                placeholder="Enter question text here..."
+              />
             </div>
 
             <div className="md:col-span-6 grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-medium">Explanation</label>
-                <textarea rows={3} className="rounded-md border px-3 py-2 text-sm" value={form.explanation} onChange={e => setForm(prev => ({ ...prev, explanation: e.target.value }))} />
+                <RichTextEditor 
+                  value={form.explanation} 
+                  onChange={val => setForm(prev => ({ ...prev, explanation: val }))} 
+                  placeholder="Enter explanation..."
+                  className="min-h-[100px]"
+                />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-medium">Reference URL</label>
@@ -335,7 +356,7 @@ export default function QuestionsPage () {
               </div>
             </div>
 
-            {form.type !== 'hotspot' && form.type !== 'dragdrop' ? (
+            {form.type !== 'hotspot' && form.type !== 'dragdrop' && form.type !== 'yesno' ? (
               <div className="md:col-span-6">
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-xs font-medium">
@@ -365,48 +386,103 @@ export default function QuestionsPage () {
             ) : (
               <div className="md:col-span-6">
                 <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-medium">{form.type === 'hotspot' ? 'Groups (Hotspot)' : 'Targets (Drag & Drop)'}</label>
-                  <button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => setForm(prev => ({ ...prev, groups: [...prev.groups, { label: '', mode: 'single', options: [{ text: '', isCorrect: true }] }] }))}>Add Group</button>
+                  <label className="text-xs font-medium">
+                    {form.type === 'hotspot' ? 'Groups (Hotspot)' : form.type === 'yesno' ? 'Statements (Yes/No)' : 'Targets (Drag & Drop)'}
+                  </label>
+                  <button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => setForm(prev => ({ ...prev, groups: [...prev.groups, { label: '', mode: 'single', options: [{ text: '', isCorrect: true }] }] }))}>
+                    {form.type === 'yesno' ? 'Add Statement' : 'Add Group'}
+                  </button>
                 </div>
                 <div className="space-y-4">
                   {form.groups.map((g, gi) => (
                     <div key={gi} className="rounded-md border p-3">
-                      <div className="flex items-center gap-2 mb-2">
-                        <input className="flex-1 rounded-md border px-3 py-2 text-sm" placeholder={form.type === 'hotspot' ? 'Group label' : 'Target label'} value={g.label} onChange={e => setForm(prev => {
-                          const next = [...prev.groups]; next[gi].label = e.target.value; return { ...prev, groups: next }
-                        })} />
-                        <select className="rounded-md border px-3 py-2 text-sm" value={g.mode} onChange={e => setForm(prev => {
-                          const next = [...prev.groups]; next[gi].mode = e.target.value as any; return { ...prev, groups: next }
-                        })}>
-                          <option value="single">Single</option>
-                          <option value="multi">Multi</option>
-                        </select>
-                        <button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => setForm(prev => ({ ...prev, groups: prev.groups.filter((_, i) => i !== gi) }))}>Remove Group</button>
-                      </div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-medium">{form.type === 'hotspot' ? 'Options' : 'Choices for this target'}</span>
-                        <button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => setForm(prev => {
-                          const next = [...prev.groups]; next[gi].options.push({ text: '', isCorrect: false }); return { ...prev, groups: next }
-                        })}>Add Option</button>
-                      </div>
-                      <div className="space-y-2">
-                        {g.options.map((opt, oi) => (
-                          <div key={oi} className="flex items-center gap-2">
-                            <input className="flex-1 rounded-md border px-3 py-2 text-sm" placeholder={`Option ${oi + 1}`} value={opt.text} onChange={e => setForm(prev => {
-                              const next = [...prev.groups]; next[gi].options[oi].text = e.target.value; return { ...prev, groups: next }
-                            })} />
-                            <label className="text-xs inline-flex items-center gap-1">
-                              <input type="checkbox" checked={opt.isCorrect} onChange={e => setForm(prev => {
-                                const next = [...prev.groups]; next[gi].options[oi].isCorrect = e.target.checked; return { ...prev, groups: next }
-                              })} />
-                              Correct
+                      {form.type === 'yesno' ? (
+                        <div className="flex items-center gap-3">
+                          <input 
+                            className="flex-1 rounded-md border px-3 py-2 text-sm" 
+                            placeholder="Statement text" 
+                            value={g.label} 
+                            onChange={e => setForm(prev => {
+                              const next = [...prev.groups]; next[gi].label = e.target.value; return { ...prev, groups: next }
+                            })} 
+                          />
+                          <div className="flex items-center gap-4 text-sm">
+                            <span className="font-medium text-xs text-gray-500">Correct Answer:</span>
+                            <label className="inline-flex items-center gap-1 cursor-pointer">
+                              <input 
+                                type="radio" 
+                                name={`yesno-${gi}`}
+                                checked={g.options[0]?.isCorrect && g.options[0]?.text === 'Yes'} 
+                                onChange={() => setForm(prev => {
+                                  const next = [...prev.groups]; 
+                                  next[gi].options = [
+                                    { text: 'Yes', isCorrect: true },
+                                    { text: 'No', isCorrect: false }
+                                  ]; 
+                                  return { ...prev, groups: next }
+                                })} 
+                              />
+                              Yes
                             </label>
-                            <button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => setForm(prev => {
-                              const next = [...prev.groups]; next[gi].options = next[gi].options.filter((_, i) => i !== oi); return { ...prev, groups: next }
-                            })}>Remove</button>
+                            <label className="inline-flex items-center gap-1 cursor-pointer">
+                              <input 
+                                type="radio" 
+                                name={`yesno-${gi}`}
+                                checked={g.options[1]?.isCorrect && g.options[1]?.text === 'No'} 
+                                onChange={() => setForm(prev => {
+                                  const next = [...prev.groups]; 
+                                  next[gi].options = [
+                                    { text: 'Yes', isCorrect: false },
+                                    { text: 'No', isCorrect: true }
+                                  ]; 
+                                  return { ...prev, groups: next }
+                                })} 
+                              />
+                              No
+                            </label>
                           </div>
-                        ))}
-                      </div>
+                          <button type="button" className="rounded-md border px-2 py-1 text-xs text-red-600 hover:bg-red-50" onClick={() => setForm(prev => ({ ...prev, groups: prev.groups.filter((_, i) => i !== gi) }))}>Remove</button>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-2 mb-2">
+                            <input className="flex-1 rounded-md border px-3 py-2 text-sm" placeholder={form.type === 'hotspot' ? 'Group label' : 'Target label'} value={g.label} onChange={e => setForm(prev => {
+                              const next = [...prev.groups]; next[gi].label = e.target.value; return { ...prev, groups: next }
+                            })} />
+                            <select className="rounded-md border px-3 py-2 text-sm" value={g.mode} onChange={e => setForm(prev => {
+                              const next = [...prev.groups]; next[gi].mode = e.target.value as any; return { ...prev, groups: next }
+                            })}>
+                              <option value="single">Single</option>
+                              <option value="multi">Multi</option>
+                            </select>
+                            <button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => setForm(prev => ({ ...prev, groups: prev.groups.filter((_, i) => i !== gi) }))}>Remove Group</button>
+                          </div>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-medium">{form.type === 'hotspot' ? 'Options' : 'Choices for this target'}</span>
+                            <button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => setForm(prev => {
+                              const next = [...prev.groups]; next[gi].options.push({ text: '', isCorrect: false }); return { ...prev, groups: next }
+                            })}>Add Option</button>
+                          </div>
+                          <div className="space-y-2">
+                            {g.options.map((opt, oi) => (
+                              <div key={oi} className="flex items-center gap-2">
+                                <input className="flex-1 rounded-md border px-3 py-2 text-sm" placeholder={`Option ${oi + 1}`} value={opt.text} onChange={e => setForm(prev => {
+                                  const next = [...prev.groups]; next[gi].options[oi].text = e.target.value; return { ...prev, groups: next }
+                                })} />
+                                <label className="text-xs inline-flex items-center gap-1">
+                                  <input type="checkbox" checked={opt.isCorrect} onChange={e => setForm(prev => {
+                                    const next = [...prev.groups]; next[gi].options[oi].isCorrect = e.target.checked; return { ...prev, groups: next }
+                                  })} />
+                                  Correct
+                                </label>
+                                <button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => setForm(prev => {
+                                  const next = [...prev.groups]; next[gi].options = next[gi].options.filter((_, i) => i !== oi); return { ...prev, groups: next }
+                                })}>Remove</button>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -467,55 +543,56 @@ function BlocksPanel ({ blocks, onCreate }: { blocks: Block[], onCreate: (title:
 function Preview ({ open, data, onClose }: { open: boolean, data: any, onClose: () => void }) {
   if (!open || !data) return null
   const q = data.question
+  
+  // Construct the question object expected by the components
+  const questionData = {
+    id: q.id || 0,
+    text: q.text,
+    explanation: q.explanation,
+    topic: q.topic,
+    type: q.type,
+    question_option: data.options?.map((o: any, i: number) => ({
+      id: o.id || i,
+      text: o.text,
+      is_correct: o.isCorrect,
+      option_order: o.optionOrder || i + 1,
+      group_id: o.groupId
+    })) || [],
+    question_group: data.groups?.map((g: any, i: number) => ({
+      id: g.id || i,
+      label: g.label,
+      mode: g.mode,
+      group_order: g.groupOrder || i + 1
+    })) || []
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-[min(90vw,800px)] rounded-xl border bg-white p-6 shadow-lg">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 overflow-y-auto py-10">
+      <div className="w-[min(95vw,1200px)] rounded-xl border bg-white p-6 shadow-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">Preview</h3>
           <button className="rounded-md border px-2 py-1" onClick={onClose}>Close</button>
         </div>
-        <div className="space-y-3">
-          <div className="text-sm text-gray-600">Type: {q.type}</div>
-          <div className="whitespace-pre-wrap">{q.text}</div>
-          {q.type === 'single' || q.type === 'yesno' ? (
-            <ul className="mt-2 space-y-1">
-              {(data.options || []).map((o: any, i: number) => (
-                <li key={i} className="flex items-center gap-2">
-                  <input type="radio" disabled /> <span>{o.text}</span>
-                </li>
-              ))}
-            </ul>
-          ) : q.type === 'multi' ? (
-            <ul className="mt-2 space-y-1">
-              {(data.options || []).map((o: any, i: number) => (
-                <li key={i} className="flex items-center gap-2">
-                  <input type="checkbox" disabled /> <span>{o.text}</span>
-                </li>
-              ))}
-            </ul>
-          ) : q.type === 'ordering' ? (
-            <ol className="list-decimal ml-6 mt-2">
-              {(data.options || []).map((o: any, i: number) => (
-                <li key={i}>{o.text}</li>
-              ))}
-            </ol>
-          ) : (q.type === 'hotspot' || q.type === 'dragdrop') ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-              {(data.groups || []).map((g: any, gi: number) => (
-                <div key={gi} className="rounded-md border p-3">
-                  <div className="font-medium">{g.label}</div>
-                  <ul className="mt-2 list-disc ml-5">
-                    {g.options.map((o: any, oi: number) => (
-                      <li key={oi}>{o.text}</li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          ) : null}
+        
+        <div className="bg-slate-50 p-4 rounded-lg">
+          {q.type === 'hotspot' || q.type === 'dragdrop' ? (
+            <HotspotQuestion 
+              question={questionData} 
+              index={1} 
+            />
+          ) : q.type === 'yesno' ? (
+            <YesNoQuestion 
+              question={questionData} 
+              index={1} 
+            />
+          ) : (
+            <MultipleChoiceQuestion 
+              question={questionData} 
+              index={1} 
+            />
+          )}
         </div>
       </div>
     </div>
   )
 }
-
