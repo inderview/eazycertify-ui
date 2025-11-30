@@ -7,6 +7,7 @@ import { RichTextEditor } from '@/components/admin/RichTextEditor'
 import { HotspotQuestion } from '@/components/questions/hotspot-question'
 import { MultipleChoiceQuestion } from '@/components/questions/multiple-choice-question'
 import { YesNoQuestion } from '@/components/questions/yesno-question'
+import { DragDropQuestion } from '@/components/questions/dragdrop-question'
 
 
 
@@ -55,7 +56,7 @@ export default function QuestionsPage () {
     explanation: '',
     referenceUrl: '',
     attachments: '',
-    options: [{ text: '', isCorrect: true }] as { text: string, isCorrect: boolean }[],
+    options: [{ text: '', isCorrect: true }] as { text: string, isCorrect: boolean, targetIndex?: number }[],
     groups: [] as { label: string, mode: 'single' | 'multi', options: { text: string, isCorrect: boolean }[] }[],
   })
 
@@ -98,22 +99,42 @@ export default function QuestionsPage () {
       ...form,
       examId: Number(form.examId),
       blockId: form.blockId ? Number(form.blockId) : undefined,
-      options: (form.type === 'hotspot' || form.type === 'dragdrop' || form.type === 'yesno')
-        ? []
-        : form.options.map((o, i) => ({
-            text: o.text,
-            isCorrect: form.type === 'ordering' ? true : o.isCorrect,
-            optionOrder: i + 1,
-          })),
     }
-    
-    // Only include groups if type is hotspot or dragdrop or yesno
-    if (form.type === 'hotspot' || form.type === 'dragdrop' || form.type === 'yesno') {
+
+    if (form.type === 'dragdrop') {
+
+      if (form.options.some(o => !o.text || !o.text.trim())) {
+        return setError('All features must have text.')
+      }
+      // DragDrop: Map flat options to groups or global, preserving global order
+      const optionsWithOrder = form.options.map((o, i) => ({ ...o, globalOrder: i + 1 }))
+
+      payload.groups = form.groups.map((g, gi) => ({
+        label: g.label,
+        mode: g.mode,
+        groupOrder: gi + 1,
+        options: optionsWithOrder
+          .filter(o => o.targetIndex === gi)
+          .map(o => ({ text: o.text, isCorrect: true, optionOrder: o.globalOrder }))
+      }))
+      payload.options = optionsWithOrder
+        .filter(o => o.targetIndex === undefined || o.targetIndex === -1)
+        .map(o => ({ text: o.text, isCorrect: false, optionOrder: o.globalOrder }))
+    } else if (form.type === 'hotspot' || form.type === 'yesno') {
+      // Hotspot/YesNo: Use nested groups directly
       payload.groups = form.groups.map((g, gi) => ({
         label: g.label,
         mode: g.mode,
         groupOrder: gi + 1,
         options: g.options.map((o, i) => ({ ...o, optionOrder: i + 1 })),
+      }))
+      payload.options = []
+    } else {
+      // Single/Multi/Ordering: Use flat options
+      payload.options = form.options.map((o, i) => ({
+        text: o.text,
+        isCorrect: form.type === 'ordering' ? true : o.isCorrect,
+        optionOrder: i + 1,
       }))
     }
     const res = await fetch(`${API_BASE}/admin/questions${editingId ? `/${editingId}` : ''}`, {
@@ -168,7 +189,12 @@ export default function QuestionsPage () {
       explanation: q.explanation ?? '',
       referenceUrl: q.referenceUrl ?? '',
       attachments: q.attachments ?? '',
-      options: data.options?.map((o: any) => ({ text: o.text, isCorrect: o.isCorrect })) ?? [{ text: '', isCorrect: true }],
+      options: q.type === 'dragdrop'
+        ? [
+            ...(data.groups?.flatMap((g: any, gi: number) => g.options.map((o: any) => ({ text: o.text, isCorrect: true, targetIndex: gi }))) || []),
+            ...(data.options?.map((o: any) => ({ text: o.text, isCorrect: false, targetIndex: -1 })) || [])
+          ]
+        : data.options?.map((o: any) => ({ text: o.text, isCorrect: o.isCorrect })) ?? [{ text: '', isCorrect: true }],
       groups: data.groups?.map((g: any) => ({ label: g.label, mode: g.mode, options: g.options.map((o: any) => ({ text: o.text, isCorrect: o.isCorrect })) })) ?? [],
     })
     setEditingId(id)
@@ -356,38 +382,69 @@ export default function QuestionsPage () {
               </div>
             </div>
 
-            {form.type !== 'hotspot' && form.type !== 'dragdrop' && form.type !== 'yesno' ? (
+
+            {/* DragDrop UI */}
+            {form.type === 'dragdrop' && (
+              <>
+                <div className="md:col-span-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-medium">Targets (Answer Area)</label>
+                    <button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => setForm(prev => ({ ...prev, groups: [...prev.groups, { label: '', mode: 'single', options: [] }] }))}>Add Target</button>
+                  </div>
+                  <div className="space-y-2">
+                    {form.groups.map((g, gi) => (
+                      <div key={gi} className="flex items-center gap-2">
+                        <input className="flex-1 rounded-md border px-3 py-2 text-sm" placeholder={`Target ${gi + 1}`} value={g.label} onChange={e => setForm(prev => {
+                          const next = [...prev.groups]; next[gi].label = e.target.value; return { ...prev, groups: next }
+                        })} />
+                        <button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => setForm(prev => ({ ...prev, groups: prev.groups.filter((_, i) => i !== gi) }))}>Remove</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="md:col-span-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-medium">Features (Options Pool)</label>
+                    <button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => setForm(prev => ({ ...prev, options: [...prev.options, { text: '', isCorrect: false, targetIndex: -1 }] }))}>Add Feature</button>
+                  </div>
+                  <div className="text-[10px] text-slate-500 mb-2">
+                    * Add all draggable items here. Assign them to a target if they are a correct answer, or leave as 'None' for distractors.
+                  </div>
+                  <div className="space-y-2">
+                    {form.options.map((opt, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <input className="flex-1 rounded-md border px-3 py-2 text-sm" placeholder={`Feature ${idx + 1}`} value={opt.text} onChange={e => setForm(prev => {
+                          const next = [...prev.options]; next[idx].text = e.target.value; return { ...prev, options: next }
+                        })} />
+                        <select 
+                          className="rounded-md border px-3 py-2 text-sm max-w-[200px]"
+                          value={opt.targetIndex ?? -1} 
+                          onChange={e => setForm(prev => {
+                            const next = [...prev.options]; 
+                            next[idx].targetIndex = Number(e.target.value); 
+                            return { ...prev, options: next }
+                          })}
+                        >
+                          <option value={-1}>None (Distractor)</option>
+                          {form.groups.map((g, gi) => (
+                            <option key={gi} value={gi}>Matches: {g.label || `Target ${gi+1}`}</option>
+                          ))}
+                        </select>
+                        <button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => setForm(prev => ({ ...prev, options: prev.options.filter((_, i) => i !== idx) }))}>Remove</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Hotspot/YesNo UI */}
+            {(form.type === 'hotspot' || form.type === 'yesno') && (
               <div className="md:col-span-6">
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-xs font-medium">
-                    {form.type === 'ordering' ? 'Answer Options (top to bottom is the correct order)' : 'Answer Options'}
-                  </label>
-                  <button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => setForm(prev => ({ ...prev, options: [...prev.options, { text: '', isCorrect: false }] }))}>Add Option</button>
-                </div>
-                <div className="space-y-2">
-                  {form.options.map((opt, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
-                      <input className="flex-1 rounded-md border px-3 py-2 text-sm" placeholder={`Option ${idx + 1}`} value={opt.text} onChange={e => setForm(prev => {
-                        const next = [...prev.options]; next[idx].text = e.target.value; return { ...prev, options: next }
-                      })} />
-                      {form.type !== 'ordering' && (
-                        <label className="text-xs inline-flex items-center gap-1">
-                          <input type="checkbox" checked={opt.isCorrect} onChange={e => setForm(prev => {
-                            const next = [...prev.options]; next[idx].isCorrect = e.target.checked; return { ...prev, options: next }
-                          })} />
-                          Correct
-                        </label>
-                      )}
-                      <button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => setForm(prev => ({ ...prev, options: prev.options.filter((_, i) => i !== idx) }))}>Remove</button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="md:col-span-6">
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-medium">
-                    {form.type === 'hotspot' ? 'Groups (Hotspot)' : form.type === 'yesno' ? 'Statements (Yes/No)' : 'Targets (Drag & Drop)'}
+                    {form.type === 'hotspot' ? 'Groups (Hotspot)' : 'Statements (Yes/No)'}
                   </label>
                   <button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => setForm(prev => ({ ...prev, groups: [...prev.groups, { label: '', mode: 'single', options: [{ text: '', isCorrect: true }] }] }))}>
                     {form.type === 'yesno' ? 'Add Statement' : 'Add Group'}
@@ -446,9 +503,14 @@ export default function QuestionsPage () {
                       ) : (
                         <>
                           <div className="flex items-center gap-2 mb-2">
-                            <input className="flex-1 rounded-md border px-3 py-2 text-sm" placeholder={form.type === 'hotspot' ? 'Group label' : 'Target label'} value={g.label} onChange={e => setForm(prev => {
-                              const next = [...prev.groups]; next[gi].label = e.target.value; return { ...prev, groups: next }
-                            })} />
+                            <input 
+                              className="flex-1 rounded-md border px-3 py-2 text-sm" 
+                              placeholder="Group label" 
+                              value={g.label} 
+                              onChange={e => setForm(prev => {
+                                const next = [...prev.groups]; next[gi].label = e.target.value; return { ...prev, groups: next }
+                              })} 
+                            />
                             <select className="rounded-md border px-3 py-2 text-sm" value={g.mode} onChange={e => setForm(prev => {
                               const next = [...prev.groups]; next[gi].mode = e.target.value as any; return { ...prev, groups: next }
                             })}>
@@ -457,12 +519,14 @@ export default function QuestionsPage () {
                             </select>
                             <button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => setForm(prev => ({ ...prev, groups: prev.groups.filter((_, i) => i !== gi) }))}>Remove Group</button>
                           </div>
+                          
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-medium">{form.type === 'hotspot' ? 'Options' : 'Choices for this target'}</span>
+                            <span className="text-xs font-medium">Options</span>
                             <button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => setForm(prev => {
                               const next = [...prev.groups]; next[gi].options.push({ text: '', isCorrect: false }); return { ...prev, groups: next }
                             })}>Add Option</button>
                           </div>
+                          
                           <div className="space-y-2">
                             {g.options.map((opt, oi) => (
                               <div key={oi} className="flex items-center gap-2">
@@ -483,6 +547,36 @@ export default function QuestionsPage () {
                           </div>
                         </>
                       )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Standard Options UI */}
+            {(form.type !== 'hotspot' && form.type !== 'dragdrop' && form.type !== 'yesno') && (
+              <div className="md:col-span-6">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-medium">
+                    {form.type === 'ordering' ? 'Answer Options (top to bottom is the correct order)' : 'Answer Options'}
+                  </label>
+                  <button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => setForm(prev => ({ ...prev, options: [...prev.options, { text: '', isCorrect: false }] }))}>Add Option</button>
+                </div>
+                <div className="space-y-2">
+                  {form.options.map((opt, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <input className="flex-1 rounded-md border px-3 py-2 text-sm" placeholder={`Option ${idx + 1}`} value={opt.text} onChange={e => setForm(prev => {
+                        const next = [...prev.options]; next[idx].text = e.target.value; return { ...prev, options: next }
+                      })} />
+                      {form.type !== 'ordering' && (
+                        <label className="text-xs inline-flex items-center gap-1">
+                          <input type="checkbox" checked={opt.isCorrect} onChange={e => setForm(prev => {
+                            const next = [...prev.options]; next[idx].isCorrect = e.target.checked; return { ...prev, options: next }
+                          })} />
+                          Correct
+                        </label>
+                      )}
+                      <button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => setForm(prev => ({ ...prev, options: prev.options.filter((_, i) => i !== idx) }))}>Remove</button>
                     </div>
                   ))}
                 </div>
@@ -575,8 +669,13 @@ function Preview ({ open, data, onClose }: { open: boolean, data: any, onClose: 
         </div>
         
         <div className="bg-slate-50 p-4 rounded-lg">
-          {q.type === 'hotspot' || q.type === 'dragdrop' ? (
+          {q.type === 'hotspot' ? (
             <HotspotQuestion 
+              question={questionData} 
+              index={1} 
+            />
+          ) : q.type === 'dragdrop' ? (
+            <DragDropQuestion 
               question={questionData} 
               index={1} 
             />

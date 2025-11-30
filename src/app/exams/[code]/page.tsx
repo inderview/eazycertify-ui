@@ -81,7 +81,12 @@ export default async function ExamPage({ params }: { params: { code: string } })
           </div>
         </div>
 
-        <ExamQuestionsList questions={questions} />
+        <ExamQuestionsList 
+          questions={questions} 
+          examId={exam.id}
+          examCode={exam.code}
+          examTitle={exam.title}
+        />
       </main>
     </div>
   )

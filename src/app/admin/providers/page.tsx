@@ -11,13 +11,14 @@ type Provider = {
   name: string
   logoUrl?: string
   status: 'active' | 'inactive'
+  sortOrder?: number
 }
 
 export default function ProvidersPage () {
   const [items, setItems] = useState<Provider[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [form, setForm] = useState({ name: '', logoUrl: '', status: 'active' as 'active' | 'inactive' })
+  const [form, setForm] = useState({ name: '', logoUrl: '', status: 'active' as 'active' | 'inactive', sortOrder: '' })
   const [editingId, setEditingId] = useState<number | null>(null)
   const [tab, setTab] = useState<'grid' | 'form'>('grid')
 
@@ -53,7 +54,7 @@ export default function ProvidersPage () {
       setError(text || 'Failed to create provider')
       return
     }
-    setForm({ name: '', logoUrl: '', status: 'active' })
+    setForm({ name: '', logoUrl: '', status: 'active', sortOrder: '' })
     await load()
   }
 
@@ -135,6 +136,16 @@ export default function ProvidersPage () {
                 <option value="inactive">Inactive</option>
               </select>
             </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium">Sort Order (optional)</label>
+              <input
+                type="number"
+                className="rounded-md border border-gray-300 px-3 py-2 text-sm dark:bg-zinc-950 dark:border-zinc-800"
+                placeholder="e.g., 1, 2, 3..."
+                value={form.sortOrder}
+                onChange={e => setForm(prev => ({ ...prev, sortOrder: e.target.value }))}
+              />
+            </div>
             <div className="flex items-end">
               <button className="rounded-md bg-blue-600 text-white text-sm px-4 py-2 hover:bg-blue-700">Add Provider</button>
             </div>
@@ -151,14 +162,15 @@ export default function ProvidersPage () {
                   <th className="py-2 pr-3">Logo</th>
                   <th className="py-2 pr-3">Name</th>
                   <th className="py-2 pr-3">Status</th>
+                  <th className="py-2 pr-3">Sort Order</th>
                   <th className="py-2 pr-3 w-40">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td className="py-4" colSpan={4}>Loading...</td></tr>
+                  <tr><td className="py-4" colSpan={5}>Loading...</td></tr>
                 ) : items.length === 0 ? (
-                  <tr><td className="py-4" colSpan={4}>No providers yet.</td></tr>
+                  <tr><td className="py-4" colSpan={5}>No providers yet.</td></tr>
                 ) : items.map(p => (
                   <tr key={p.id} className="border-t border-gray-100 dark:border-zinc-800 hover:bg-gray-50/50 dark:hover:bg-zinc-900/40">
                     <td className="py-2 pr-3">
@@ -184,6 +196,15 @@ export default function ProvidersPage () {
                         <option value="active">Active</option>
                         <option value="inactive">Inactive</option>
                       </select>
+                    </td>
+                    <td className="py-2 pr-3">
+                      <input
+                        type="number"
+                        value={p.sortOrder ?? ''}
+                        onChange={e => onSave(p.id, { sortOrder: e.target.value ? Number(e.target.value) : undefined })}
+                        className="rounded-md border border-gray-300 px-2 py-1 text-sm w-20 dark:bg-zinc-950 dark:border-zinc-800"
+                        placeholder="—"
+                      />
                     </td>
                     <td className="py-2 pr-3">
                       <div className="flex gap-2">

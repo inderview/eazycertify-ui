@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { MultipleChoiceQuestion } from './questions/multiple-choice-question'
 import { HotspotQuestion } from './questions/hotspot-question'
 import { YesNoQuestion } from './questions/yesno-question'
+import { DragDropQuestion } from './questions/dragdrop-question'
 
 interface Option {
   id: number
@@ -30,21 +31,58 @@ interface Question {
   question_group: Group[]
 }
 
+import { useEffect } from 'react'
+import PricingModal from './PricingModal'
+import { createSupabaseBrowserClient } from '@/lib/supabase/client'
+
 interface ExamQuestionsListProps {
   questions: Question[]
+  examId: number
+  examCode: string
+  examTitle: string
+  hasAccess?: boolean
 }
 
-export default function ExamQuestionsList({ questions }: ExamQuestionsListProps) {
+export default function ExamQuestionsList({ questions, examId, examCode, examTitle, hasAccess: initialHasAccess = false }: ExamQuestionsListProps) {
+  const [hasAccess, setHasAccess] = useState(initialHasAccess)
   const [mode, setMode] = useState<'practice' | 'view'>('practice')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(5)
   const [pageInput, setPageInput] = useState('')
+  const [showPricingModal, setShowPricingModal] = useState(false)
+  
+  const supabase = createSupabaseBrowserClient()
+
+  useEffect(() => {
+    const checkAccess = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        try {
+          // Use the API_BASE from env or default
+          const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001/api'
+          const res = await fetch(`${API_BASE}/purchases/check-access?examId=${examId}&userId=${session.user.id}`)
+          if (res.ok) {
+            const data = await res.json()
+            if (data.hasAccess) {
+              setHasAccess(true)
+            }
+          }
+        } catch (err) {
+          console.error('Error checking access:', err)
+        }
+      }
+    }
+    checkAccess()
+  }, [examId])
 
   // Calculate pagination
   const totalPages = Math.ceil(questions.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
   const currentQuestions = questions.slice(startIndex, endIndex)
+  
+  const FREE_LIMIT = 20
+  const isPaywallActive = !hasAccess && startIndex >= FREE_LIMIT
 
   // Reset to page 1 when itemsPerPage changes
   const handleItemsPerPageChange = (newItemsPerPage: number) => {
@@ -76,6 +114,15 @@ export default function ExamQuestionsList({ questions }: ExamQuestionsListProps)
 
   return (
     <div>
+      {showPricingModal && (
+        <PricingModal
+          examId={examId}
+          examCode={examCode}
+          examTitle={examTitle}
+          onClose={() => setShowPricingModal(false)}
+        />
+      )}
+
       {/* Mode and Pagination Controls - Top */}
       <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 bg-white rounded-lg border border-slate-200 shadow-sm">
         <div className="flex items-center gap-3">
@@ -119,52 +166,84 @@ export default function ExamQuestionsList({ questions }: ExamQuestionsListProps)
         </div>
       </div>
 
-      {/* Questions List */}
+      {/* Questions List or Paywall */}
       <div className="space-y-8">
-        {currentQuestions.map((question, index) => {
-          const globalIndex = startIndex + index + 1
-          
-          switch (question.type) {
-            case 'hotspot':
-              return (
-                <HotspotQuestion 
-                  key={question.id} 
-                  question={question} 
-                  index={globalIndex}
-                  readOnly={readOnly}
-                />
-              )
-            case 'dragdrop':
-              return (
-                <HotspotQuestion 
-                  key={question.id} 
-                  question={question} 
-                  index={globalIndex}
-                  readOnly={readOnly}
-                />
-              )
-            case 'yesno':
-              return (
-                <YesNoQuestion 
-                  key={question.id} 
-                  question={question} 
-                  index={globalIndex}
-                  readOnly={readOnly}
-                />
-              )
-            case 'single':
-            case 'multi':
-            default:
-              return (
-                <MultipleChoiceQuestion 
-                  key={question.id} 
-                  question={question} 
-                  index={globalIndex}
-                  readOnly={readOnly}
-                />
-              )
-          }
-        })}
+        {isPaywallActive ? (
+          <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
+            <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <span className="text-4xl">🔒</span>
+            </div>
+            <h3 className="text-2xl font-bold text-slate-900 mb-3">Premium Content</h3>
+            <p className="text-slate-600 max-w-md mx-auto mb-8">
+              You've reached the limit of free questions. Unlock the full exam to continue practicing with all {questions.length} questions.
+            </p>
+            <button
+              onClick={() => setShowPricingModal(true)}
+              className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-8 py-4 rounded-xl text-lg font-bold hover:shadow-lg transition-all transform hover:-translate-y-1"
+            >
+              Unlock Full Access
+            </button>
+            <p className="mt-4 text-sm text-slate-500">
+              One-time payment • Lifetime access • Money-back guarantee
+            </p>
+          </div>
+        ) : (
+          currentQuestions.map((question, index) => {
+            const globalIndex = startIndex + index + 1
+            
+            // If we are on a mixed page (some free, some paid), block the paid ones
+            if (!hasAccess && globalIndex > FREE_LIMIT) {
+               return (
+                 <div key={question.id} className="bg-slate-50 rounded-lg border border-slate-200 p-8 text-center">
+                    <span className="text-2xl">🔒</span>
+                    <p className="mt-2 text-slate-600 font-medium">Premium Question {globalIndex}</p>
+                    <button onClick={() => setShowPricingModal(true)} className="mt-2 text-blue-600 hover:underline text-sm">Unlock Full Access</button>
+                 </div>
+               )
+            }
+
+            switch (question.type) {
+              case 'hotspot':
+                return (
+                  <HotspotQuestion 
+                    key={question.id} 
+                    question={question} 
+                    index={globalIndex}
+                    readOnly={readOnly}
+                  />
+                )
+              case 'dragdrop':
+                return (
+                  <DragDropQuestion 
+                    key={question.id} 
+                    question={question} 
+                    index={globalIndex}
+                    readOnly={readOnly}
+                  />
+                )
+              case 'yesno':
+                return (
+                  <YesNoQuestion 
+                    key={question.id} 
+                    question={question} 
+                    index={globalIndex}
+                    readOnly={readOnly}
+                  />
+                )
+              case 'single':
+              case 'multi':
+              default:
+                return (
+                  <MultipleChoiceQuestion 
+                    key={question.id} 
+                    question={question} 
+                    index={globalIndex}
+                    readOnly={readOnly}
+                  />
+                )
+            }
+          })
+        )}
       </div>
 
       {/* Pagination Controls - Bottom */}

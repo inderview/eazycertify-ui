@@ -19,6 +19,9 @@ type Exam = {
   totalQuestionsInBank: number
   questionsPerMockTest: number
   price?: number
+  purchasable?: boolean
+  sortOrder?: number
+  imageUrl?: string
 }
 
 export default function ExamsPage () {
@@ -27,6 +30,7 @@ export default function ExamsPage () {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<'grid' | 'form'>('grid')
+  const [editingId, setEditingId] = useState<number | null>(null)
   const [form, setForm] = useState({
     providerId: 0,
     code: '',
@@ -38,6 +42,9 @@ export default function ExamsPage () {
     totalQuestionsInBank: 0,
     questionsPerMockTest: 65,
     price: '' as string | number,
+    purchasable: false,
+    sortOrder: '' as string | number,
+    imageUrl: '',
   })
 
   async function loadData () {
@@ -60,6 +67,47 @@ export default function ExamsPage () {
 
   useEffect(() => { loadData() }, [])
 
+  async function onSubmit (e: React.FormEvent) {
+    e.preventDefault()
+    if (editingId) {
+      await onUpdate(editingId, {
+        ...form,
+        providerId: Number(form.providerId),
+        timeLimitMinutes: Number(form.timeLimitMinutes),
+        passingScorePercent: Number(form.passingScorePercent),
+        totalQuestionsInBank: Number(form.totalQuestionsInBank),
+        questionsPerMockTest: Number(form.questionsPerMockTest),
+        price: form.price === '' ? undefined : Number(form.price),
+        purchasable: form.purchasable,
+        sortOrder: form.sortOrder === '' ? undefined : Number(form.sortOrder),
+      })
+      setEditingId(null)
+      setTab('grid')
+      resetForm()
+    } else {
+      await onCreate(e)
+    }
+  }
+
+  function resetForm() {
+    setForm({
+      providerId: 0,
+      code: '',
+      title: '',
+      version: '',
+      status: 'draft',
+      timeLimitMinutes: 60,
+      passingScorePercent: 70,
+      totalQuestionsInBank: 0,
+      questionsPerMockTest: 65,
+      price: '',
+      purchasable: false,
+      sortOrder: '',
+      imageUrl: '',
+    })
+    setEditingId(null)
+  }
+
   async function onCreate (e: React.FormEvent) {
     e.preventDefault()
     setError(null)
@@ -72,6 +120,7 @@ export default function ExamsPage () {
       totalQuestionsInBank: Number(form.totalQuestionsInBank),
       questionsPerMockTest: Number(form.questionsPerMockTest),
       price: form.price === '' ? undefined : Number(form.price),
+      purchasable: form.purchasable,
     }
     const res = await fetch(`${API_BASE}/admin/exams`, {
       method: 'POST',
@@ -83,7 +132,7 @@ export default function ExamsPage () {
       setError(text || 'Failed to create exam')
       return
     }
-    setForm(prev => ({ ...prev, code: '', title: '', version: '' }))
+    resetForm()
     await loadData()
   }
 
@@ -127,19 +176,19 @@ export default function ExamsPage () {
       </Card>
 
       {tab === 'form' && (
-        <Card>
+        <Card title={editingId ? 'Edit Exam' : 'Add Exam'}>
           {error && <div className="mb-3 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/30 dark:border-red-900/50 dark:text-red-300">{error}</div>}
 
-        <form onSubmit={onCreate} className="grid grid-cols-1 md:grid-cols-6 gap-3">
+        <form onSubmit={onSubmit} className="grid grid-cols-1 md:grid-cols-6 gap-3">
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium">Provider</label>
             <select
               required
               className="rounded-md border border-gray-300 px-3 py-2 text-sm dark:bg-zinc-950 dark:border-zinc-800"
-              value={form.providerId}
+              value={form.providerId || ''}
               onChange={e => setForm(prev => ({ ...prev, providerId: Number(e.target.value) }))}
             >
-              <option value={0}>Select Provider</option>
+              <option value="">Select Provider</option>
               {providers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
@@ -190,7 +239,23 @@ export default function ExamsPage () {
             </select>
           </div>
 
-          <button className="rounded-md bg-blue-600 text-white text-sm px-4 py-2 hover:bg-blue-700">Add Exam</button>
+          <div className="flex gap-2">
+            <button className="rounded-md bg-blue-600 text-white text-sm px-4 py-2 hover:bg-blue-700">
+              {editingId ? 'Update Exam' : 'Add Exam'}
+            </button>
+            {editingId && (
+              <button
+                type="button"
+                onClick={() => {
+                  resetForm()
+                  setTab('grid')
+                }}
+                className="rounded-md border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
 
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium">Time Limit (minutes)</label>
@@ -241,6 +306,39 @@ export default function ExamsPage () {
               onChange={e => setForm(prev => ({ ...prev, price: e.target.value }))}
             />
           </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="purchasable"
+              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              checked={form.purchasable}
+              onChange={e => setForm(prev => ({ ...prev, purchasable: e.target.checked }))}
+            />
+            <label htmlFor="purchasable" className="text-xs font-medium cursor-pointer">Purchasable (Allow users to buy)</label>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium">Sort Order (optional)</label>
+            <input
+              type="number"
+              className="rounded-md border border-gray-300 px-3 py-2 text-sm dark:bg-zinc-950 dark:border-zinc-800"
+              placeholder="e.g., 1, 2, 3..."
+              value={form.sortOrder}
+              onChange={e => setForm(prev => ({ ...prev, sortOrder: e.target.value }))}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1 md:col-span-6">
+            <label className="text-xs font-medium">Image URL (optional)</label>
+            <input
+              type="url"
+              className="rounded-md border border-gray-300 px-3 py-2 text-sm dark:bg-zinc-950 dark:border-zinc-800"
+              placeholder="https://example.com/image.jpg"
+              value={form.imageUrl}
+              onChange={e => setForm(prev => ({ ...prev, imageUrl: e.target.value }))}
+            />
+          </div>
         </form>
         </Card>
       )}
@@ -261,14 +359,16 @@ export default function ExamsPage () {
                 <th className="py-2 pr-3">Bank</th>
                 <th className="py-2 pr-3">Mock Qs</th>
                 <th className="py-2 pr-3">Price</th>
+                <th className="py-2 pr-3">Purchasable</th>
+                <th className="py-2 pr-3">Sort</th>
                 <th className="py-2 pr-3 w-32">Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td className="py-4" colSpan={11}>Loading...</td></tr>
+                <tr><td className="py-4" colSpan={13}>Loading...</td></tr>
               ) : items.length === 0 ? (
-                <tr><td className="py-4" colSpan={11}>No exams yet.</td></tr>
+                <tr><td className="py-4" colSpan={13}>No exams yet.</td></tr>
               ) : items.map(ex => (
                 <tr key={ex.id} className="border-t border-gray-100 dark:border-zinc-800 hover:bg-gray-50/50 dark:hover:bg-zinc-900/40">
                   <td className="py-2 pr-3">{providers.find(p => p.id === ex.providerId)?.name ?? ex.providerId}</td>
@@ -292,10 +392,55 @@ export default function ExamsPage () {
                   <td className="py-2 pr-3">{ex.questionsPerMockTest}</td>
                   <td className="py-2 pr-3">{ex.price ?? '—'}</td>
                   <td className="py-2 pr-3">
+                    <div className="relative group">
+                      <button
+                        onClick={() => onUpdate(ex.id, { purchasable: !ex.purchasable })}
+                        className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                          ex.purchasable
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                            : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 cursor-not-allowed'
+                        }`}
+                      >
+                        {ex.purchasable ? '✓ Yes' : '✗ No'}
+                      </button>
+                      {!ex.purchasable && (
+                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                          Coming Soon
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                  <td className="py-2 pr-3">
+                    <input
+                      type="number"
+                      value={ex.sortOrder ?? ''}
+                      onChange={e => onUpdate(ex.id, { sortOrder: e.target.value ? Number(e.target.value) : undefined })}
+                      className="rounded-md border border-gray-300 px-2 py-1 text-sm w-16 dark:bg-zinc-950 dark:border-zinc-800"
+                      placeholder="—"
+                    />
+                  </td>
+                  <td className="py-2 pr-3">
                     <div className="flex gap-2">
                       <button
                         className="rounded-md border px-3 py-1 hover:bg-gray-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
-                        onClick={() => onUpdate(ex.id, { title: prompt('New title', ex.title) ?? ex.title })}
+                        onClick={() => {
+                          setEditingId(ex.id)
+                          setForm({
+                            providerId: ex.providerId,
+                            code: ex.code,
+                            title: ex.title,
+                            version: ex.version,
+                            status: ex.status,
+                            timeLimitMinutes: ex.timeLimitMinutes,
+                            passingScorePercent: ex.passingScorePercent,
+                            totalQuestionsInBank: ex.totalQuestionsInBank,
+                            questionsPerMockTest: ex.questionsPerMockTest,
+                            price: ex.price ?? '',
+                            purchasable: ex.purchasable ?? false,
+                            sortOrder: ex.sortOrder ?? '',
+                          })
+                          setTab('form')
+                        }}
                       >
                         Edit
                       </button>
