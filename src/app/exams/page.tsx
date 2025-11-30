@@ -2,6 +2,7 @@ import { Suspense } from 'react'
 import ExamTile from '@/components/exam-tile'
 import { ProviderFilter } from './components/provider-filter'
 import { SearchAndSort } from './components/search-and-sort'
+import { ExamsGrid } from './components/exams-grid'
 import { Header } from '@/components/header'
 import { Footer } from '@/components/footer'
 
@@ -65,28 +66,7 @@ export default async function ExamsPage(props: { searchParams: Promise<any> }) {
              <span className="text-slate-500 text-sm">{exams.length} exams found</span>
           </div>
           
-          {exams.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-               {exams.map((exam: any) => (
-                  <ExamTile 
-                     key={exam.id}
-                     code={exam.code}
-                     title={exam.title}
-                     providerName={exam.providerName}
-                     totalQuestions={exam.totalQuestionsInBank}
-                     imageUrl={exam.imageUrl}
-                     hot={exam.sortOrder < 10} // Mock logic for hot
-                     updatedAt={exam.updatedAt}
-                  />
-               ))}
-            </div>
-          ) : (
-            <div className="text-center py-20">
-              <div className="text-6xl mb-4">🔍</div>
-              <h3 className="text-xl font-semibold text-slate-800 mb-2">No exams found</h3>
-              <p className="text-slate-500">Try adjusting your search or filters</p>
-            </div>
-          )}
+          <ExamsGrid exams={exams} />
        </div>
 
        <Footer />

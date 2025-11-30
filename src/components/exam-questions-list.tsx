@@ -81,7 +81,7 @@ export default function ExamQuestionsList({ questions, examId, examCode, examTit
   const endIndex = startIndex + itemsPerPage
   const currentQuestions = questions.slice(startIndex, endIndex)
   
-  const FREE_LIMIT = 20
+  const FREE_LIMIT = Number(process.env.NEXT_PUBLIC_FREE_QUESTION_LIMIT) || 10
   const isPaywallActive = !hasAccess && startIndex >= FREE_LIMIT
 
   // Reset to page 1 when itemsPerPage changes

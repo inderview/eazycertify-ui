@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { loadStripe } from '@stripe/stripe-js'
+import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001/api'
@@ -17,6 +18,7 @@ export default function PricingModal({ examId, examCode, examTitle, onClose }: P
 	const [selectedDuration, setSelectedDuration] = useState<'1month' | '3months' | '1year'>('3months')
 	const [withAI, setWithAI] = useState(false)
 	const [loading, setLoading] = useState(false)
+    const supabase = createSupabaseBrowserClient()
 
 	const pricing = {
 		'1month': { base: 9.99, withAI: 19.99, label: '1 Month', popular: false },
@@ -28,6 +30,9 @@ export default function PricingModal({ examId, examCode, examTitle, onClose }: P
 
 	const handleCheckout = async () => {
 		setLoading(true)
+        const { data: { session } } = await supabase.auth.getSession()
+        const userId = session?.user?.id
+
 		try {
 			const response = await fetch(`${API_BASE}/stripe/create-checkout-session`, {
 				method: 'POST',
@@ -38,6 +43,7 @@ export default function PricingModal({ examId, examCode, examTitle, onClose }: P
 					examTitle,
 					duration: selectedDuration,
 					withAI,
+                    userId,
 				}),
 			})
 
