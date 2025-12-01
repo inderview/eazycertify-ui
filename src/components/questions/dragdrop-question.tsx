@@ -32,9 +32,11 @@ interface DragDropQuestionProps {
   question: Question
   index: number
   readOnly?: boolean
+  isMarked?: boolean
+  onToggleMark?: () => void
 }
 
-export function DragDropQuestion({ question, index, readOnly }: DragDropQuestionProps) {
+export function DragDropQuestion({ question, index, readOnly, isMarked, onToggleMark }: DragDropQuestionProps) {
   const [revealed, setRevealed] = useState(false)
   const [draggedItem, setDraggedItem] = useState<number | null>(null)
   const [assignments, setAssignments] = useState<Record<number, number>>({}) // group_id -> option_id
@@ -105,7 +107,7 @@ export function DragDropQuestion({ question, index, readOnly }: DragDropQuestion
   const allOptions = getAllOptions()
 
   return (
-    <QuestionCard index={index} topic={question.topic}>
+    <QuestionCard index={index} topic={question.topic} isMarked={isMarked} onToggleMark={onToggleMark}>
       <div 
         className="prose prose-slate max-w-none mb-8 text-slate-800 font-medium whitespace-pre-wrap"
         dangerouslySetInnerHTML={{ __html: question.text }}

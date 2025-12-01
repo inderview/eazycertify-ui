@@ -28,7 +28,15 @@ type Question = {
   question_group?: Group[]
 }
 
-export function YesNoQuestion({ question, index, readOnly }: { question: Question, index: number, readOnly?: boolean }) {
+interface YesNoQuestionProps {
+  question: Question
+  index: number
+  readOnly?: boolean
+  isMarked?: boolean
+  onToggleMark?: () => void
+}
+
+export function YesNoQuestion({ question, index, readOnly, isMarked, onToggleMark }: YesNoQuestionProps) {
   const [selections, setSelections] = useState<Record<number, number>>({}) // group_id -> option_id
   const [revealed, setRevealed] = useState(false)
 
@@ -48,7 +56,7 @@ export function YesNoQuestion({ question, index, readOnly }: { question: Questio
   const sortedGroups = question.question_group?.sort((a, b) => (a.group_order || 0) - (b.group_order || 0)) || []
 
   return (
-    <QuestionCard index={index} topic={question.topic}>
+    <QuestionCard index={index} topic={question.topic} isMarked={isMarked} onToggleMark={onToggleMark}>
       <div 
         className="prose prose-slate max-w-none mb-8 text-slate-800 font-medium whitespace-pre-wrap"
         dangerouslySetInnerHTML={{ __html: question.text }}

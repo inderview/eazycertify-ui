@@ -43,6 +43,8 @@ export default function ExamPrepHomepage() {
 	const [exams, setExams] = useState<Exam[]>([])
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
+	const [showSuggestions, setShowSuggestions] = useState(false)
+	const [suggestions, setSuggestions] = useState<Exam[]>([])
 
 	useEffect(() => {
 		const fetchData = async () => {
@@ -74,6 +76,40 @@ export default function ExamPrepHomepage() {
 
 		fetchData()
 	}, [])
+
+	// Update suggestions when search query changes
+	useEffect(() => {
+		if (searchQuery.trim().length > 0) {
+			const filtered = exams.filter((exam) =>
+				exam.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+				exam.title.toLowerCase().includes(searchQuery.toLowerCase())
+			).slice(0, 5) // Limit to 5 suggestions
+			setSuggestions(filtered)
+			setShowSuggestions(true)
+		} else {
+			setSuggestions([])
+			setShowSuggestions(false)
+		}
+	}, [searchQuery, exams])
+
+	const handleSearch = () => {
+		if (searchQuery.trim()) {
+			// Navigate to exams page with search query
+			window.location.href = `/exams?search=${encodeURIComponent(searchQuery)}`
+		}
+	}
+
+	const handleSuggestionClick = (examCode: string) => {
+		setSearchQuery(examCode)
+		setShowSuggestions(false)
+		window.location.href = `/exams?search=${encodeURIComponent(examCode)}`
+	}
+
+	const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+		if (e.key === 'Enter') {
+			handleSearch()
+		}
+	}
 
 	// Map provider names to category IDs
 	const providerToCategory: Record<string, string> = {
@@ -153,8 +189,8 @@ export default function ExamPrepHomepage() {
 							<span className="block text-cyan-400">With Confidence</span>
 						</h1>
 
-						{/* Search Bar */}
-						<div className="max-w-2xl mx-auto mb-12">
+						{/* Search Bar with Autosuggest */}
+						<div className="max-w-2xl mx-auto mb-12 relative">
 							<div className="bg-white rounded-2xl p-2 flex items-center shadow-2xl">
 								<div className="pl-4 pr-2">
 									<svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -167,11 +203,33 @@ export default function ExamPrepHomepage() {
 									className="flex-1 px-3 py-3 text-slate-700 outline-none text-base"
 									value={searchQuery}
 									onChange={(e) => setSearchQuery(e.target.value)}
+									onKeyPress={handleKeyPress}
+									onFocus={() => searchQuery && setShowSuggestions(true)}
+									onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
 								/>
-								<button className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-8 py-3 rounded-xl font-semibold hover:shadow-lg">
+								<button 
+									onClick={handleSearch}
+									className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-8 py-3 rounded-xl font-semibold hover:shadow-lg transition-all"
+								>
 									Search
 								</button>
 							</div>
+
+							{/* Autosuggest Dropdown */}
+							{showSuggestions && suggestions.length > 0 && (
+								<div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden z-50">
+									{suggestions.map((exam) => (
+										<button
+											key={exam.id}
+											onClick={() => handleSuggestionClick(exam.code)}
+											className="w-full px-6 py-3 text-left hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-b-0"
+										>
+											<div className="font-semibold text-slate-900">{exam.code}</div>
+											<div className="text-sm text-slate-600 truncate">{exam.title}</div>
+										</button>
+									))}
+								</div>
+							)}
 						</div>
 
 						{/* Stats */}

@@ -50,6 +50,10 @@ export default function ExamQuestionsList({ questions, examId, examCode, examTit
   const [itemsPerPage, setItemsPerPage] = useState(5)
   const [pageInput, setPageInput] = useState('')
   const [showPricingModal, setShowPricingModal] = useState(false)
+  const [markedQuestions, setMarkedQuestions] = useState<Set<number>>(new Set())
+  const [showOnlyMarked, setShowOnlyMarked] = useState(false)
+  
+  const [lockError, setLockError] = useState<string | null>(null)
   
   const supabase = createSupabaseBrowserClient()
 
@@ -60,12 +64,21 @@ export default function ExamQuestionsList({ questions, examId, examCode, examTit
         try {
           // Use the API_BASE from env or default
           const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001/api'
-          const res = await fetch(`${API_BASE}/purchases/check-access?examId=${examId}&userId=${session.user.id}`)
+          
+          // Get device fingerprint
+          const { getDeviceFingerprint } = await import('@/lib/device-fingerprint')
+          const fingerprint = getDeviceFingerprint()
+          
+          const res = await fetch(`${API_BASE}/purchases/check-access?examId=${examId}&userId=${session.user.id}&deviceFingerprint=${encodeURIComponent(fingerprint)}`)
+          const data = await res.json()
+          
           if (res.ok) {
-            const data = await res.json()
             if (data.hasAccess) {
               setHasAccess(true)
             }
+          } else if (res.status === 403 && data.isLocked) {
+             setLockError(data.error)
+             setHasAccess(false)
           }
         } catch (err) {
           console.error('Error checking access:', err)
@@ -75,11 +88,46 @@ export default function ExamQuestionsList({ questions, examId, examCode, examTit
     checkAccess()
   }, [examId])
 
+  if (lockError) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-xl p-8 text-center max-w-2xl mx-auto my-12">
+        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <span className="text-3xl">🚫</span>
+        </div>
+        <h3 className="text-xl font-bold text-red-900 mb-2">Account Locked</h3>
+        <p className="text-red-700 mb-6">{lockError}</p>
+        <button 
+          onClick={() => window.location.href = '/support'}
+          className="bg-red-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-red-700 transition-colors"
+        >
+          Contact Support
+        </button>
+      </div>
+    )
+  }
+
+  const toggleMarkQuestion = (questionId: number) => {
+    setMarkedQuestions(prev => {
+      const next = new Set(prev)
+      if (next.has(questionId)) {
+        next.delete(questionId)
+      } else {
+        next.add(questionId)
+      }
+      return next
+    })
+  }
+
+  // Filter questions based on showOnlyMarked
+  const filteredQuestions = showOnlyMarked 
+    ? questions.filter(q => markedQuestions.has(q.id))
+    : questions
+
   // Calculate pagination
-  const totalPages = Math.ceil(questions.length / itemsPerPage)
+  const totalPages = Math.ceil(filteredQuestions.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
-  const currentQuestions = questions.slice(startIndex, endIndex)
+  const currentQuestions = filteredQuestions.slice(startIndex, endIndex)
   
   const FREE_LIMIT = Number(process.env.NEXT_PUBLIC_FREE_QUESTION_LIMIT) || 10
   const isPaywallActive = !hasAccess && startIndex >= FREE_LIMIT
@@ -151,7 +199,25 @@ export default function ExamQuestionsList({ questions, examId, examCode, examTit
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          {markedQuestions.size > 0 && (
+            <button
+              onClick={() => {
+                setShowOnlyMarked(!showOnlyMarked)
+                setCurrentPage(1) // Reset to first page when toggling
+              }}
+              className={`px-4 py-1.5 text-sm font-medium rounded-lg border transition-all flex items-center gap-2 ${
+                showOnlyMarked
+                  ? 'bg-yellow-100 border-yellow-400 text-yellow-800'
+                  : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <svg className="w-4 h-4" fill={showOnlyMarked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+              </svg>
+              {showOnlyMarked ? `Showing ${markedQuestions.size} Marked` : `Review ${markedQuestions.size} Marked`}
+            </button>
+          )}
           <span className="text-sm font-medium text-slate-700">Questions per page:</span>
           <select
             value={itemsPerPage}
@@ -210,6 +276,8 @@ export default function ExamQuestionsList({ questions, examId, examCode, examTit
                     question={question} 
                     index={globalIndex}
                     readOnly={readOnly}
+                    isMarked={markedQuestions.has(question.id)}
+                    onToggleMark={() => toggleMarkQuestion(question.id)}
                   />
                 )
               case 'dragdrop':
@@ -219,6 +287,8 @@ export default function ExamQuestionsList({ questions, examId, examCode, examTit
                     question={question} 
                     index={globalIndex}
                     readOnly={readOnly}
+                    isMarked={markedQuestions.has(question.id)}
+                    onToggleMark={() => toggleMarkQuestion(question.id)}
                   />
                 )
               case 'yesno':
@@ -228,6 +298,8 @@ export default function ExamQuestionsList({ questions, examId, examCode, examTit
                     question={question} 
                     index={globalIndex}
                     readOnly={readOnly}
+                    isMarked={markedQuestions.has(question.id)}
+                    onToggleMark={() => toggleMarkQuestion(question.id)}
                   />
                 )
               case 'single':
@@ -239,6 +311,8 @@ export default function ExamQuestionsList({ questions, examId, examCode, examTit
                     question={question} 
                     index={globalIndex}
                     readOnly={readOnly}
+                    isMarked={markedQuestions.has(question.id)}
+                    onToggleMark={() => toggleMarkQuestion(question.id)}
                   />
                 )
             }
@@ -250,7 +324,8 @@ export default function ExamQuestionsList({ questions, examId, examCode, examTit
       {totalPages > 1 && (
         <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 p-4 bg-white rounded-lg border border-slate-200 shadow-sm">
           <div className="text-sm text-slate-600">
-            Showing {startIndex + 1} to {Math.min(endIndex, questions.length)} of {questions.length} questions
+            Showing {startIndex + 1} to {Math.min(endIndex, filteredQuestions.length)} of {filteredQuestions.length} questions
+            {showOnlyMarked && <span className="ml-1 text-yellow-700 font-medium">(marked only)</span>}
           </div>
 
           <div className="flex items-center gap-2">

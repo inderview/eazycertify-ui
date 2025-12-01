@@ -22,9 +22,11 @@ interface Question {
 interface MultipleChoiceQuestionProps {
   question: Question
   index: number
+  isMarked?: boolean
+  onToggleMark?: () => void
 }
 
-export function MultipleChoiceQuestion({ question, index, readOnly }: MultipleChoiceQuestionProps & { readOnly?: boolean }) {
+export function MultipleChoiceQuestion({ question, index, readOnly, isMarked, onToggleMark }: MultipleChoiceQuestionProps & { readOnly?: boolean }) {
   const [revealed, setRevealed] = useState(false)
   const [selectedOptions, setSelectedOptions] = useState<number[]>([])
 
@@ -47,7 +49,7 @@ export function MultipleChoiceQuestion({ question, index, readOnly }: MultipleCh
   const isSelected = (id: number) => selectedOptions.includes(id)
 
   return (
-    <QuestionCard index={index} topic={question.topic}>
+    <QuestionCard index={index} topic={question.topic} isMarked={isMarked} onToggleMark={onToggleMark}>
       <div 
         className="prose prose-slate max-w-none mb-8 text-slate-800 font-medium whitespace-pre-wrap"
         dangerouslySetInnerHTML={{ __html: question.text }}

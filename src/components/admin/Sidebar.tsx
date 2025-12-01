@@ -33,6 +33,7 @@ export function Sidebar () {
         <NavItem href="/admin/exams" label="Exams" />
         <NavItem href="/admin/questions" label="Questions" />
         <NavItem href="/admin/users" label="Users" />
+        <NavItem href="/admin/locked-accounts" label="Locked Accounts" />
         <NavItem href="/admin/revenue" label="Revenue" />
         <NavItem href="/admin/settings" label="Settings" />
       </nav>
