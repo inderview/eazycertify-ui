@@ -30,6 +30,7 @@ async function getQuestionCount(examId: number) {
 		.from('question')
 		.select('*', { count: 'exact', head: true })
 		.eq('exam_id', examId)
+		.eq('status', 'published')
 
 	if (error) {
 		console.error('Error fetching question count:', error)

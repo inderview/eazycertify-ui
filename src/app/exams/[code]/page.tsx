@@ -34,6 +34,7 @@ async function getQuestions(examId: number) {
       question_group (*)
     `)
     .eq('exam_id', examId)
+    .eq('status', 'published')
     .order('id', { ascending: true })
 
   if (error) {
