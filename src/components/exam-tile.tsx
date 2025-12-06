@@ -100,22 +100,35 @@ export default function ExamTile({
 
 					{/* Action Buttons */}
 					<div className="flex gap-3">
-						<Link
-							href={`/exams/${code}/details`}
-							className="flex-1 bg-white border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-50 hover:border-slate-300 transition-all text-center flex items-center justify-center"
-						>
-							View Exam
-						</Link>
-						{expiresAt ? null : (
-							<button 
-								onClick={() => setShowPricingModal(true)}
-								className="flex-1 bg-slate-900 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-800 hover:shadow-lg transition-all flex items-center justify-center gap-2"
+						{expiresAt ? (
+							<Link
+								href={`/exams/${code}`}
+								className="flex-1 bg-blue-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-700 hover:shadow-lg transition-all text-center flex items-center justify-center gap-2"
 							>
-								<span>Buy</span>
-								<svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+								<span>View Exam</span>
+								<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
 								</svg>
-							</button>
+							</Link>
+						) : (
+							<>
+								<Link
+									href={`/exams/${code}/details`}
+									className="flex-1 bg-white border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-50 hover:border-slate-300 transition-all text-center flex items-center justify-center"
+								>
+									View Details
+								</Link>
+								<button 
+									onClick={() => setShowPricingModal(true)}
+									className="flex-1 bg-slate-900 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-800 hover:shadow-lg transition-all flex items-center justify-center gap-2"
+								>
+									<span>Buy</span>
+									<svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+									</svg>
+								</button>
+							</>
 						)}
 					</div>
 				</div>

@@ -36,10 +36,12 @@ interface DragDropQuestionProps {
   onToggleMark?: () => void
 }
 
-export function DragDropQuestion({ question, index, readOnly, isMarked, onToggleMark }: DragDropQuestionProps) {
+export function DragDropQuestion({ question, index, readOnly, isMarked, onToggleMark, globalExpanded = true, globalRevealed = false }: DragDropQuestionProps & { globalExpanded?: boolean, globalRevealed?: boolean }) {
   const [revealed, setRevealed] = useState(false)
   const [draggedItem, setDraggedItem] = useState<number | null>(null)
   const [assignments, setAssignments] = useState<Record<number, number>>({}) // group_id -> option_id
+
+  const isRevealed = globalRevealed || revealed
 
   // Get all draggable items (options from all groups)
   const getAllOptions = () => {
@@ -75,7 +77,7 @@ export function DragDropQuestion({ question, index, readOnly, isMarked, onToggle
   }
 
   const handleDragStart = (optionId: number) => {
-    if (revealed || readOnly) return
+    if (isRevealed || readOnly) return
     setDraggedItem(optionId)
   }
 
@@ -84,7 +86,7 @@ export function DragDropQuestion({ question, index, readOnly, isMarked, onToggle
   }
 
   const handleDrop = (groupId: number) => {
-    if (revealed || readOnly || draggedItem === null) return
+    if (isRevealed || readOnly || draggedItem === null) return
     
     setAssignments(prev => ({
       ...prev,
@@ -94,7 +96,7 @@ export function DragDropQuestion({ question, index, readOnly, isMarked, onToggle
   }
 
   const handleRemoveAssignment = (groupId: number) => {
-    if (revealed || readOnly) return
+    if (isRevealed || readOnly) return
     
     setAssignments(prev => {
       const next = { ...prev }
@@ -107,7 +109,7 @@ export function DragDropQuestion({ question, index, readOnly, isMarked, onToggle
   const allOptions = getAllOptions()
 
   return (
-    <QuestionCard index={index} topic={question.topic} isMarked={isMarked} onToggleMark={onToggleMark}>
+    <QuestionCard index={index} topic={question.topic} isMarked={isMarked} onToggleMark={onToggleMark} collapsed={!globalExpanded}>
       <div 
         className="prose prose-slate max-w-none mb-8 text-slate-800 font-medium whitespace-pre-wrap"
         dangerouslySetInnerHTML={{ __html: question.text }}
@@ -125,13 +127,13 @@ export function DragDropQuestion({ question, index, readOnly, isMarked, onToggle
               return (
                 <div
                   key={option.id}
-                  draggable={!revealed && !readOnly && !isAssigned}
+                  draggable={!isRevealed && !readOnly && !isAssigned}
                   onDragStart={() => handleDragStart(option.id)}
                   className={`
                     px-4 py-3 rounded-lg border-2 transition-all text-sm
                     ${isAssigned 
                       ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-50' 
-                      : revealed || readOnly
+                      : isRevealed || readOnly
                         ? 'bg-white border-slate-300 cursor-default'
                         : 'bg-white border-slate-300 cursor-move hover:border-blue-400 hover:bg-blue-50'
                     }
@@ -166,12 +168,12 @@ export function DragDropQuestion({ question, index, readOnly, isMarked, onToggle
                     className={`
                       min-h-[60px] px-4 py-3 rounded-lg border-2 transition-all relative
                       ${assignedOption
-                        ? revealed
+                        ? isRevealed
                           ? isCorrect
                             ? 'bg-emerald-50 border-emerald-500'
                             : 'bg-red-50 border-red-500'
                           : 'bg-blue-50 border-blue-400'
-                        : revealed || readOnly
+                        : isRevealed || readOnly
                           ? 'bg-slate-50 border-slate-200'
                           : 'bg-slate-50 border-dashed border-slate-300 hover:border-blue-400 hover:bg-blue-50/30'
                       }
@@ -182,7 +184,7 @@ export function DragDropQuestion({ question, index, readOnly, isMarked, onToggle
                         <span className="text-sm flex-1">{assignedOption.text}</span>
                         
                         {/* Remove button (only when not revealed and not readOnly) */}
-                        {!revealed && !readOnly && (
+                        {!isRevealed && !readOnly && (
                           <button
                             onClick={() => handleRemoveAssignment(group.id)}
                             className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full hover:bg-slate-200 transition-colors"
@@ -195,7 +197,7 @@ export function DragDropQuestion({ question, index, readOnly, isMarked, onToggle
                         )}
 
                         {/* Status icons when revealed */}
-                        {revealed && (
+                        {isRevealed && (
                           <div className="flex-shrink-0">
                             {isCorrect ? (
                               <div className="w-6 h-6 flex items-center justify-center bg-emerald-500 text-white rounded-full">
@@ -215,12 +217,12 @@ export function DragDropQuestion({ question, index, readOnly, isMarked, onToggle
                       </div>
                     ) : (
                       <div className="text-sm text-slate-400 italic">
-                        {revealed || readOnly ? 'No answer' : 'Drag an item here'}
+                        {isRevealed || readOnly ? 'No answer' : 'Drag an item here'}
                       </div>
                     )}
 
                     {/* Show correct answer when revealed and wrong/empty */}
-                    {revealed && (!assignedOption || !isCorrect) && correctOption && (
+                    {isRevealed && (!assignedOption || !isCorrect) && correctOption && (
                       <div className="mt-2 pt-2 border-t border-slate-300 text-sm text-emerald-700 font-medium">
                         ✓ Correct answer: {correctOption.text}
                       </div>
@@ -244,11 +246,11 @@ export function DragDropQuestion({ question, index, readOnly, isMarked, onToggle
           onClick={() => setRevealed(!revealed)}
           className="bg-[#0078D4] text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
         >
-          {revealed ? 'Hide Solution' : 'Reveal Solution'}
+          {isRevealed ? 'Hide Solution' : 'Reveal Solution'}
         </button>
       </div>
 
-      {revealed && question.explanation && (
+      {isRevealed && question.explanation && (
         <div className="mt-6 p-5 bg-slate-50 rounded-xl border border-slate-200 text-sm text-slate-600">
           <h4 className="font-semibold text-slate-800 mb-2">Explanation:</h4>
           <div className="whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: question.explanation }} />

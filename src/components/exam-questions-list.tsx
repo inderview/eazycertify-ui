@@ -53,6 +53,9 @@ export default function ExamQuestionsList({ questions, examId, examCode, examTit
   const [markedQuestions, setMarkedQuestions] = useState<Set<number>>(new Set())
   const [showOnlyMarked, setShowOnlyMarked] = useState(false)
   
+  const [globalExpanded, setGlobalExpanded] = useState(true)
+  const [globalRevealed, setGlobalRevealed] = useState(false)
+  
   const [lockError, setLockError] = useState<string | null>(null)
   
   const supabase = createSupabaseBrowserClient()
@@ -60,6 +63,8 @@ export default function ExamQuestionsList({ questions, examId, examCode, examTit
   useEffect(() => {
     const checkAccess = async () => {
       const { data: { session } } = await supabase.auth.getSession()
+      console.log('Session check:', session?.user?.id)
+      
       if (session?.user) {
         try {
           // Use the API_BASE from env or default
@@ -69,20 +74,28 @@ export default function ExamQuestionsList({ questions, examId, examCode, examTit
           const { getDeviceFingerprint } = await import('@/lib/device-fingerprint')
           const fingerprint = getDeviceFingerprint()
           
+          console.log(`Checking access for examId=${examId}, userId=${session.user.id}`)
           const res = await fetch(`${API_BASE}/purchases/check-access?examId=${examId}&userId=${session.user.id}&deviceFingerprint=${encodeURIComponent(fingerprint)}`)
           const data = await res.json()
+          console.log('Access check response:', data)
           
           if (res.ok) {
             if (data.hasAccess) {
+              console.log('Access granted!')
               setHasAccess(true)
+            } else {
+              console.log('Access denied by server')
             }
           } else if (res.status === 403 && data.isLocked) {
+             console.log('Access locked:', data.error)
              setLockError(data.error)
              setHasAccess(false)
           }
         } catch (err) {
           console.error('Error checking access:', err)
         }
+      } else {
+        console.log('No user session found')
       }
     }
     checkAccess()
@@ -208,30 +221,11 @@ export default function ExamQuestionsList({ questions, examId, examCode, examTit
         />
       )}
 
-      {/* Launch Simulator Button */}
-      <div className="mb-6 p-6 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg text-white shadow-lg">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-2xl font-bold mb-1">Ready to take the full exam?</h3>
-            <p className="text-blue-100">Experience the real exam simulator with timed questions and instant results.</p>
-          </div>
-          <button
-            onClick={handleLaunchSimulator}
-            className="px-8 py-4 bg-white text-blue-600 font-bold rounded-xl hover:bg-blue-50 transition-all transform hover:scale-105 shadow-lg flex items-center gap-2"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Launch Simulator
-          </button>
-        </div>
-      </div>
+
 
       {/* Mode and Pagination Controls - Top */}
       <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 bg-white rounded-lg border border-slate-200 shadow-sm">
         <div className="flex items-center gap-3">
-          <span className="text-sm font-medium text-slate-700">Mode:</span>
           <div className="inline-flex rounded-lg border border-slate-300 p-1 bg-slate-50">
             <button
               onClick={() => setMode('practice')}
@@ -252,6 +246,32 @@ export default function ExamQuestionsList({ questions, examId, examCode, examTit
               }`}
             >
               View Mode
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 ml-4">
+            <button
+              onClick={() => setGlobalExpanded(!globalExpanded)}
+              className="px-3 py-1.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-50 transition-colors flex items-center gap-2"
+            >
+              <svg className={`w-4 h-4 transition-transform ${globalExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+              {globalExpanded ? 'Collapse All Questions' : 'Expand All Questions'}
+            </button>
+            <button
+              onClick={() => setGlobalRevealed(!globalRevealed)}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md border transition-colors flex items-center gap-2 ${
+                globalRevealed 
+                  ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100' 
+                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              {globalRevealed ? 'Hide All Answers' : 'Show All Answers'}
             </button>
           </div>
         </div>
@@ -335,6 +355,8 @@ export default function ExamQuestionsList({ questions, examId, examCode, examTit
                     readOnly={readOnly}
                     isMarked={markedQuestions.has(question.id)}
                     onToggleMark={() => toggleMarkQuestion(question.id)}
+                    globalExpanded={globalExpanded}
+                    globalRevealed={globalRevealed}
                   />
                 )
               case 'dragdrop':
@@ -346,6 +368,8 @@ export default function ExamQuestionsList({ questions, examId, examCode, examTit
                     readOnly={readOnly}
                     isMarked={markedQuestions.has(question.id)}
                     onToggleMark={() => toggleMarkQuestion(question.id)}
+                    globalExpanded={globalExpanded}
+                    globalRevealed={globalRevealed}
                   />
                 )
               case 'yesno':
@@ -357,6 +381,8 @@ export default function ExamQuestionsList({ questions, examId, examCode, examTit
                     readOnly={readOnly}
                     isMarked={markedQuestions.has(question.id)}
                     onToggleMark={() => toggleMarkQuestion(question.id)}
+                    globalExpanded={globalExpanded}
+                    globalRevealed={globalRevealed}
                   />
                 )
               case 'single':
@@ -370,6 +396,8 @@ export default function ExamQuestionsList({ questions, examId, examCode, examTit
                     readOnly={readOnly}
                     isMarked={markedQuestions.has(question.id)}
                     onToggleMark={() => toggleMarkQuestion(question.id)}
+                    globalExpanded={globalExpanded}
+                    globalRevealed={globalRevealed}
                   />
                 )
             }

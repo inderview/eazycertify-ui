@@ -15,16 +15,28 @@ export function ExamsGrid({ exams }: ExamsGridProps) {
   useEffect(() => {
     const fetchPurchases = async () => {
       const { data: { session } } = await supabase.auth.getSession()
+      console.log('ExamsGrid: Session:', session?.user?.id)
+      
       if (session?.user) {
         try {
-          const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/purchases/my-purchases?userId=${session.user.id}`)
+          const email = session.user.email
+          const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001/api'
+          const url = `${API_BASE}/purchases/my-purchases?userId=${session.user.id}&email=${email}`
+          console.log('ExamsGrid: Fetching purchases from:', url)
+          
+          const res = await fetch(url)
           if (res.ok) {
             const data = await res.json()
+            console.log('ExamsGrid: Purchases loaded:', data)
             setPurchases(data)
+          } else {
+            console.log('ExamsGrid: Failed to fetch purchases:', res.status)
           }
         } catch (error) {
-          console.error('Error fetching purchases:', error)
+          console.error('ExamsGrid: Error fetching purchases:', error)
         }
+      } else {
+        console.log('ExamsGrid: No active session')
       }
     }
 
@@ -45,6 +57,12 @@ export function ExamsGrid({ exams }: ExamsGridProps) {
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
        {exams.map((exam: any) => {
           const purchase = purchases.find(p => p.examCode === exam.code)
+          console.log(`ExamsGrid: Matching exam ${exam.code}`, { 
+            purchase, 
+            hasPurchase: !!purchase,
+            expiresAt: purchase?.expiresAt,
+            purchaseCodes: purchases.map(p => p.examCode)
+          })
           return (
             <ExamTile 
                key={exam.id}

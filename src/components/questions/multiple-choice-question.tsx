@@ -26,14 +26,15 @@ interface MultipleChoiceQuestionProps {
   onToggleMark?: () => void
 }
 
-export function MultipleChoiceQuestion({ question, index, readOnly, isMarked, onToggleMark }: MultipleChoiceQuestionProps & { readOnly?: boolean }) {
+export function MultipleChoiceQuestion({ question, index, readOnly, isMarked, onToggleMark, globalExpanded = true, globalRevealed = false }: MultipleChoiceQuestionProps & { readOnly?: boolean, globalExpanded?: boolean, globalRevealed?: boolean }) {
   const [revealed, setRevealed] = useState(false)
   const [selectedOptions, setSelectedOptions] = useState<number[]>([])
 
   const isMulti = question.type === 'multi'
+  const isRevealed = globalRevealed || revealed
 
   const handleOptionClick = (optionId: number) => {
-    if (revealed || readOnly) return
+    if (isRevealed || readOnly) return
 
     if (isMulti) {
       setSelectedOptions(prev => 
@@ -49,7 +50,7 @@ export function MultipleChoiceQuestion({ question, index, readOnly, isMarked, on
   const isSelected = (id: number) => selectedOptions.includes(id)
 
   return (
-    <QuestionCard index={index} topic={question.topic} isMarked={isMarked} onToggleMark={onToggleMark}>
+    <QuestionCard index={index} topic={question.topic} isMarked={isMarked} onToggleMark={onToggleMark} collapsed={!globalExpanded}>
       <div 
         className="prose prose-slate max-w-none mb-8 text-slate-800 font-medium whitespace-pre-wrap"
         dangerouslySetInnerHTML={{ __html: question.text }}
@@ -64,7 +65,7 @@ export function MultipleChoiceQuestion({ question, index, readOnly, isMarked, on
           let indicatorClass = "border-slate-300 bg-white"
           let indicatorContent = null
 
-          if (revealed) {
+          if (isRevealed) {
             if (correct) {
                // Correct answer (whether selected or not)
                containerClass = "bg-emerald-50 border-emerald-200"
@@ -118,12 +119,12 @@ export function MultipleChoiceQuestion({ question, index, readOnly, isMarked, on
                 {indicatorContent}
               </div>
               
-              <span className={`text-sm flex-1 ${revealed && correct ? 'text-emerald-900 font-medium' : (revealed && selected && !correct ? 'text-red-900 font-medium' : 'text-slate-700')}`}>
+              <span className={`text-sm flex-1 ${isRevealed && correct ? 'text-emerald-900 font-medium' : (isRevealed && selected && !correct ? 'text-red-900 font-medium' : 'text-slate-700')}`}>
                 {option.text}
               </span>
 
               {/* Right side status icon for revealed state */}
-              {revealed && (
+              {isRevealed && (
                 <div className="flex-shrink-0 ml-2">
                   {correct && (
                     <span className="flex items-center justify-center w-6 h-6 bg-emerald-100 text-emerald-600 rounded-full" title="Correct Answer">
@@ -151,20 +152,11 @@ export function MultipleChoiceQuestion({ question, index, readOnly, isMarked, on
           onClick={() => setRevealed(!revealed)}
           className="bg-[#0078D4] text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
         >
-          {revealed ? 'Hide Solution' : 'Reveal Solution'}
+          {isRevealed ? 'Hide Solution' : 'Reveal Solution'}
         </button>
-        
-        {/* Discussion button hidden for now
-        <button className="flex items-center gap-2 text-slate-500 hover:text-slate-700 text-sm font-medium px-4 py-2.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-          </svg>
-          Discussion
-        </button>
-        */}
       </div>
 
-      {revealed && question.explanation && (
+      {isRevealed && question.explanation && (
         <div className="mt-6 p-5 bg-slate-50 rounded-xl border border-slate-200 text-sm text-slate-600">
           <h4 className="font-semibold text-slate-800 mb-2">Explanation:</h4>
           <div className="whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: question.explanation }} />

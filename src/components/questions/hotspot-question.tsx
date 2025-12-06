@@ -146,9 +146,11 @@ function CustomDropdown({
   )
 }
 
-export function HotspotQuestion({ question, index, readOnly, isMarked, onToggleMark }: HotspotQuestionProps) {
+export function HotspotQuestion({ question, index, readOnly, isMarked, onToggleMark, globalExpanded = true, globalRevealed = false }: HotspotQuestionProps & { globalExpanded?: boolean, globalRevealed?: boolean }) {
   const [selections, setSelections] = useState<Record<number, number>>({}) // group_id -> option_id
   const [revealed, setRevealed] = useState(false)
+
+  const isRevealed = globalRevealed || revealed
 
   // Group options by group_id
   const getGroupOptions = (groupId: number) => {
@@ -176,7 +178,7 @@ export function HotspotQuestion({ question, index, readOnly, isMarked, onToggleM
   const sortedGroups = question.question_group?.sort((a, b) => (a.group_order || 0) - (b.group_order || 0)) || []
 
   return (
-    <QuestionCard index={index} topic={question.topic} isMarked={isMarked} onToggleMark={onToggleMark}>
+    <QuestionCard index={index} topic={question.topic} isMarked={isMarked} onToggleMark={onToggleMark} collapsed={!globalExpanded}>
       <div 
         className="prose prose-slate max-w-none mb-8 text-slate-800 font-medium whitespace-pre-wrap"
         dangerouslySetInnerHTML={{ __html: question.text }}
@@ -202,19 +204,19 @@ export function HotspotQuestion({ question, index, readOnly, isMarked, onToggleM
                     options={groupOptions}
                     value={userSelection || null}
                     onChange={(optionId) => handleSelectionChange(group.id, optionId)}
-                    revealed={revealed}
+                    revealed={isRevealed}
                     isCorrect={isCorrect}
                     disabled={readOnly}
                   />
                   
                   {/* Show correct answer when revealed and user got it wrong */}
-                  {revealed && userSelection && !isCorrect && correctOption && (
+                  {isRevealed && userSelection && !isCorrect && correctOption && (
                     <div className="mt-2 text-sm text-green-700 font-medium">
                       ✓ Correct answer: {correctOption.text}
                     </div>
                   )}
                   
-                  {revealed && userSelection && isCorrect && (
+                  {isRevealed && userSelection && isCorrect && (
                     <div className="mt-2 text-sm text-green-700 font-medium">
                       ✓ Correct!
                     </div>
@@ -237,11 +239,11 @@ export function HotspotQuestion({ question, index, readOnly, isMarked, onToggleM
           onClick={() => setRevealed(!revealed)}
           className="bg-[#0078D4] text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
         >
-          {revealed ? 'Hide Solution' : 'Reveal Solution'}
+          {isRevealed ? 'Hide Solution' : 'Reveal Solution'}
         </button>
       </div>
 
-      {revealed && question.explanation && (
+      {isRevealed && question.explanation && (
         <div className="mt-6 p-5 bg-slate-50 rounded-xl border border-slate-200 text-sm text-slate-600">
           <h4 className="font-semibold text-slate-800 mb-2">Explanation:</h4>
           <div className="whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: question.explanation }} />

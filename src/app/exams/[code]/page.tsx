@@ -45,49 +45,119 @@ async function getQuestions(examId: number) {
   return questions
 }
 
+import Link from 'next/link'
+import { LaunchSimulatorCard } from '@/components/launch-simulator-card'
+import { cookies } from 'next/headers'
+import { createServerClient } from '@supabase/ssr'
+
 export default async function ExamPage({ params }: { params: { code: string } }) {
   const { code } = await params
+  const cookieStore = await cookies()
+  
+  const supabaseServer = createServerClient(
+    supabaseUrl,
+    supabaseAnonKey,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet: any) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }: any) =>
+              cookieStore.set(name, value, options)
+            )
+          } catch {
+            // Ignore errors in server components
+          }
+        },
+      },
+    }
+  )
+
+  const { data: { user } } = await supabaseServer.auth.getUser()
   const exam = await getExam(code)
 
   if (!exam) {
     notFound()
   }
 
+  let hasAccess = false
+  if (user) {
+    console.log('ExamPage: Checking access for user:', user.id, 'exam:', exam.id)
+    const { data: purchase, error } = await supabaseServer
+      .from('purchase')
+      .select('id, expires_at')
+      .eq('user_id', user.id)
+      .eq('exam_id', exam.id)
+      .gt('expires_at', new Date().toISOString())
+      .single()
+    
+    console.log('ExamPage: Purchase query result:', { purchase, error })
+    
+    if (purchase) {
+      hasAccess = true
+      console.log('ExamPage: Access GRANTED')
+    } else {
+      console.log('ExamPage: Access DENIED - no valid purchase found')
+    }
+  } else {
+    console.log('ExamPage: No user logged in')
+  }
+
   const questions = await getQuestions(exam.id)
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 flex flex-col">
       <Header />
       
-      <main className="mx-auto max-w-5xl px-4 py-10">
-        <div className="mb-8">
-          <div className="flex items-center gap-2 text-sm text-slate-500 mb-2">
-            <span>Exams</span>
-            <span>/</span>
-            <span>{exam.provider?.name || 'Unknown Provider'}</span>
-            <span>/</span>
-            <span className="text-slate-900 font-medium">{exam.code}</span>
-          </div>
-          
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">
-            {exam.code}: {exam.title}
-          </h1>
-          <div className="flex items-center gap-4 text-sm">
-            <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-medium">
-              {questions.length} Questions
-            </span>
-            <span className="text-slate-500">
-              Last updated: {new Date(exam.updated_at || Date.now()).toLocaleDateString()}
-            </span>
+      {/* Hero Section */}
+      <div className="bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900 text-white py-8">
+        <div className="container mx-auto px-4 max-w-6xl">
+          <div className="flex flex-col md:flex-row gap-6 items-start justify-between">
+            <div className="flex-1">
+              {/* Breadcrumb */}
+              <div className="flex items-center gap-2 text-sm text-blue-200 mb-4">
+                <Link href="/" className="hover:text-white transition-colors">Home</Link>
+                <span>/</span>
+                <Link href="/exams" className="hover:text-white transition-colors">Exams</Link>
+                <span>/</span>
+                <span className="text-white font-medium">{exam.code}</span>
+              </div>
+
+              <h1 className="text-2xl md:text-3xl font-bold text-white mb-3">
+                {exam.code}: {exam.title}
+              </h1>
+              
+              <div className="flex items-center gap-4 text-sm text-blue-100">
+                <span className="bg-white/10 px-3 py-1 rounded-full border border-white/10 backdrop-blur-sm">
+                  {questions.length} Questions
+                </span>
+                <span>
+                  Last updated: {new Date(exam.updated_at || Date.now()).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                </span>
+              </div>
+            </div>
+
+            {/* Simulator Card (Right Side) */}
+            <div className="shrink-0">
+              <LaunchSimulatorCard examId={exam.id} />
+            </div>
           </div>
         </div>
+      </div>
 
-        <ExamQuestionsList 
-          questions={questions} 
-          examId={exam.id}
-          examCode={exam.code}
-          examTitle={exam.title}
-        />
+      <main className="flex-1 container mx-auto px-4 max-w-6xl py-8">
+        {/* Questions List */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+          <ExamQuestionsList 
+            questions={questions} 
+            examId={exam.id}
+            examCode={exam.code}
+            examTitle={exam.title}
+            hasAccess={hasAccess}
+          />
+        </div>
       </main>
     </div>
   )

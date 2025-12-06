@@ -36,9 +36,11 @@ interface YesNoQuestionProps {
   onToggleMark?: () => void
 }
 
-export function YesNoQuestion({ question, index, readOnly, isMarked, onToggleMark }: YesNoQuestionProps) {
+export function YesNoQuestion({ question, index, readOnly, isMarked, onToggleMark, globalExpanded = true, globalRevealed = false }: YesNoQuestionProps & { globalExpanded?: boolean, globalRevealed?: boolean }) {
   const [selections, setSelections] = useState<Record<number, number>>({}) // group_id -> option_id
   const [revealed, setRevealed] = useState(false)
+
+  const isRevealed = globalRevealed || revealed
 
   // Group options by group_id
   const getGroupOptions = (groupId: number) => {
@@ -56,7 +58,7 @@ export function YesNoQuestion({ question, index, readOnly, isMarked, onToggleMar
   const sortedGroups = question.question_group?.sort((a, b) => (a.group_order || 0) - (b.group_order || 0)) || []
 
   return (
-    <QuestionCard index={index} topic={question.topic} isMarked={isMarked} onToggleMark={onToggleMark}>
+    <QuestionCard index={index} topic={question.topic} isMarked={isMarked} onToggleMark={onToggleMark} collapsed={!globalExpanded}>
       <div 
         className="prose prose-slate max-w-none mb-8 text-slate-800 font-medium whitespace-pre-wrap"
         dangerouslySetInnerHTML={{ __html: question.text }}
@@ -93,8 +95,8 @@ export function YesNoQuestion({ question, index, readOnly, isMarked, onToggleMar
                           <label className={`relative flex items-center justify-center w-6 h-6 rounded-full border-2 transition-all
                             ${readOnly ? 'cursor-default' : 'cursor-pointer'}
                             ${userSelection === yesOption.id ? 'border-blue-600 bg-blue-600' : 'border-slate-400 bg-white'}
-                            ${revealed && yesOption.is_correct ? '!border-green-500 !bg-green-500' : ''}
-                            ${revealed && userSelection === yesOption.id && !yesOption.is_correct ? '!border-red-500 !bg-red-500' : ''}
+                            ${isRevealed && yesOption.is_correct ? '!border-green-500 !bg-green-500' : ''}
+                            ${isRevealed && userSelection === yesOption.id && !yesOption.is_correct ? '!border-red-500 !bg-red-500' : ''}
                           `}>
                             <input 
                               type="radio" 
@@ -103,7 +105,7 @@ export function YesNoQuestion({ question, index, readOnly, isMarked, onToggleMar
                               checked={userSelection === yesOption.id}
                               onChange={() => handleSelectionChange(group.id, yesOption.id)}
                             />
-                            {(userSelection === yesOption.id || (revealed && yesOption.is_correct)) && (
+                            {(userSelection === yesOption.id || (isRevealed && yesOption.is_correct)) && (
                               <div className="w-2.5 h-2.5 bg-white rounded-full" />
                             )}
                           </label>
@@ -116,8 +118,8 @@ export function YesNoQuestion({ question, index, readOnly, isMarked, onToggleMar
                           <label className={`relative flex items-center justify-center w-6 h-6 rounded-full border-2 transition-all
                             ${readOnly ? 'cursor-default' : 'cursor-pointer'}
                             ${userSelection === noOption.id ? 'border-blue-600 bg-blue-600' : 'border-slate-400 bg-white'}
-                            ${revealed && noOption.is_correct ? '!border-green-500 !bg-green-500' : ''}
-                            ${revealed && userSelection === noOption.id && !noOption.is_correct ? '!border-red-500 !bg-red-500' : ''}
+                            ${isRevealed && noOption.is_correct ? '!border-green-500 !bg-green-500' : ''}
+                            ${isRevealed && userSelection === noOption.id && !noOption.is_correct ? '!border-red-500 !bg-red-500' : ''}
                           `}>
                             <input 
                               type="radio" 
@@ -126,7 +128,7 @@ export function YesNoQuestion({ question, index, readOnly, isMarked, onToggleMar
                               checked={userSelection === noOption.id}
                               onChange={() => handleSelectionChange(group.id, noOption.id)}
                             />
-                            {(userSelection === noOption.id || (revealed && noOption.is_correct)) && (
+                            {(userSelection === noOption.id || (isRevealed && noOption.is_correct)) && (
                               <div className="w-2.5 h-2.5 bg-white rounded-full" />
                             )}
                           </label>
@@ -152,14 +154,14 @@ export function YesNoQuestion({ question, index, readOnly, isMarked, onToggleMar
           onClick={() => setRevealed(!revealed)}
           className="bg-[#0078D4] text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
         >
-          {revealed ? 'Hide Solution' : 'Reveal Solution'}
+          {isRevealed ? 'Hide Solution' : 'Reveal Solution'}
         </button>
       </div>
 
-      {revealed && question.explanation && (
+      {isRevealed && question.explanation && (
         <div className="mt-6 p-5 bg-slate-50 rounded-xl border border-slate-200 text-sm text-slate-600">
           <h4 className="font-semibold text-slate-800 mb-2">Explanation:</h4>
-          <div className="whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: question.explanation }} />
+          <div className="whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: question.explanation || '' }} />
         </div>
       )}
     </QuestionCard>
