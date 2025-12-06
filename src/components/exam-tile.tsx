@@ -6,6 +6,7 @@ import Image from 'next/image'
 import PricingModal from './PricingModal'
 
 interface ExamTileProps {
+	examId: number
 	code: string
 	title: string
 	providerName: string
@@ -18,6 +19,7 @@ interface ExamTileProps {
 }
 
 export default function ExamTile({
+	examId,
 	code,
 	title,
 	providerName,
@@ -29,10 +31,6 @@ export default function ExamTile({
 	expiresAt,
 }: ExamTileProps) {
 	const [showPricingModal, setShowPricingModal] = useState(false)
-	
-	// Note: We'll need the examId to be passed in the future
-	// For now, using a placeholder. You may want to add examId to ExamTileProps
-	const examId = 0 // Placeholder - should come from props
 
 	return (
 		<>
@@ -108,17 +106,12 @@ export default function ExamTile({
 						>
 							View Exam
 						</Link>
-						{expiresAt ? (
-							<div className="flex-1 bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-2.5 rounded-xl text-xs font-semibold flex flex-col items-center justify-center text-center">
-								<span>Active Plan</span>
-								<span className="text-[10px] opacity-80">Expires {new Date(expiresAt).toLocaleDateString()}</span>
-							</div>
-						) : (
+						{expiresAt ? null : (
 							<button 
 								onClick={() => setShowPricingModal(true)}
 								className="flex-1 bg-slate-900 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-800 hover:shadow-lg transition-all flex items-center justify-center gap-2"
 							>
-								<span>Buy Now</span>
+								<span>Buy</span>
 								<svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
 								</svg>

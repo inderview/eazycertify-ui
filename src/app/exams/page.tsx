@@ -53,14 +53,14 @@ export default async function ExamsPage(props: { searchParams: Promise<any> }) {
        
        {/* Filters Section */}
        <div className="bg-white border-b border-slate-100 sticky top-[73px] z-10 pt-4">
-          <div className="container mx-auto px-4">
+          <div className="max-w-7xl mx-auto px-4">
              <ProviderFilter providers={providers} />
              <SearchAndSort />
           </div>
        </div>
 
        {/* Results */}
-       <div className="container mx-auto px-4 py-8 pb-20">
+       <div className="max-w-7xl mx-auto px-4 py-8 pb-20">
           <div className="flex justify-between items-center mb-6">
              <h1 className="text-2xl font-bold text-slate-800">All Exams</h1>
              <span className="text-slate-500 text-sm">{exams.length} exams found</span>

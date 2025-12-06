@@ -48,6 +48,7 @@ export function ExamsGrid({ exams }: ExamsGridProps) {
           return (
             <ExamTile 
                key={exam.id}
+               examId={exam.id}
                code={exam.code}
                title={exam.title}
                providerName={exam.providerName}

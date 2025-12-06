@@ -22,6 +22,75 @@ type Exam = {
   purchasable?: boolean
   sortOrder?: number
   imageUrl?: string
+  configuration?: {
+    topicDistribution?: Record<string, number>
+    typeDistribution?: Record<string, number>
+    overlapPolicy?: {
+      minNewPercent?: number
+      maxRepeatFromLast?: number
+    }
+  }
+}
+
+function DistributionEditor({ label, value, onChange, options }: { label: string, value: Record<string, number>, onChange: (val: Record<string, number>) => void, options?: string[] }) {
+  const [newKey, setNewKey] = useState('')
+  const [newCount, setNewCount] = useState(0)
+
+  const add = () => {
+    if (!newKey) return
+    onChange({ ...value, [newKey]: newCount })
+    setNewKey('')
+    setNewCount(0)
+  }
+
+  const remove = (key: string) => {
+    const next = { ...value }
+    delete next[key]
+    onChange(next)
+  }
+
+  return (
+    <div className="flex flex-col gap-2 border p-3 rounded-md dark:border-zinc-800">
+      <label className="text-xs font-medium">{label}</label>
+      <div className="flex gap-2">
+        {options ? (
+          <select
+            className="flex-1 rounded-md border border-gray-300 px-2 py-1 text-sm dark:bg-zinc-950 dark:border-zinc-800"
+            value={newKey}
+            onChange={e => setNewKey(e.target.value)}
+          >
+            <option value="">Select Type</option>
+            {options.map(opt => (
+              <option key={opt} value={opt}>{opt}</option>
+            ))}
+          </select>
+        ) : (
+          <input 
+            placeholder="Name" 
+            className="flex-1 rounded-md border border-gray-300 px-2 py-1 text-sm dark:bg-zinc-950 dark:border-zinc-800"
+            value={newKey} 
+            onChange={e => setNewKey(e.target.value)} 
+          />
+        )}
+        <input 
+          type="number" 
+          placeholder="Count" 
+          className="w-20 rounded-md border border-gray-300 px-2 py-1 text-sm dark:bg-zinc-950 dark:border-zinc-800"
+          value={newCount} 
+          onChange={e => setNewCount(Number(e.target.value))} 
+        />
+        <button type="button" onClick={add} className="bg-blue-600 text-white px-3 rounded-md text-sm">+</button>
+      </div>
+      <div className="flex flex-col gap-1 mt-2">
+        {Object.entries(value).map(([k, v]) => (
+          <div key={k} className="flex justify-between items-center bg-gray-50 dark:bg-zinc-900 p-2 rounded text-sm">
+            <span>{k}: {v}</span>
+            <button type="button" onClick={() => remove(k)} className="text-red-500">×</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 export default function ExamsPage () {
@@ -45,6 +114,14 @@ export default function ExamsPage () {
     purchasable: false,
     sortOrder: '' as string | number,
     imageUrl: '',
+    configuration: {
+      topicDistribution: {} as Record<string, number>,
+      typeDistribution: {} as Record<string, number>,
+      overlapPolicy: {
+        minNewPercent: 0,
+        maxRepeatFromLast: 0
+      }
+    }
   })
 
   async function loadData () {
@@ -104,6 +181,11 @@ export default function ExamsPage () {
       purchasable: false,
       sortOrder: '',
       imageUrl: '',
+      configuration: {
+        topicDistribution: {},
+        typeDistribution: {},
+        overlapPolicy: { minNewPercent: 0, maxRepeatFromLast: 0 }
+      }
     })
     setEditingId(null)
   }
@@ -339,6 +421,45 @@ export default function ExamsPage () {
               onChange={e => setForm(prev => ({ ...prev, imageUrl: e.target.value }))}
             />
           </div>
+
+          <div className="md:col-span-6 border-t pt-4 mt-2">
+            <h3 className="text-sm font-medium mb-3">Mock Exam Configuration</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <DistributionEditor 
+                label="Topic Distribution (Topic -> Count)" 
+                value={form.configuration.topicDistribution} 
+                onChange={val => setForm(prev => ({ ...prev, configuration: { ...prev.configuration, topicDistribution: val } }))}
+              />
+              <DistributionEditor 
+                label="Question Type Distribution (Fallback)" 
+                value={form.configuration.typeDistribution} 
+                onChange={val => setForm(prev => ({ ...prev, configuration: { ...prev.configuration, typeDistribution: val } }))}
+                options={['single', 'multi', 'ordering', 'yesno', 'hotspot', 'dragdrop']}
+              />
+              <div className="flex flex-col gap-2 border p-3 rounded-md dark:border-zinc-800">
+                <label className="text-xs font-medium">Overlap Policy</label>
+                <div className="flex gap-2 items-center">
+                  <label className="text-xs w-32">Min New % (0-1)</label>
+                  <input 
+                    type="number" 
+                    step="0.1"
+                    className="flex-1 rounded-md border border-gray-300 px-2 py-1 text-sm dark:bg-zinc-950 dark:border-zinc-800"
+                    value={form.configuration.overlapPolicy.minNewPercent}
+                    onChange={e => setForm(prev => ({ ...prev, configuration: { ...prev.configuration, overlapPolicy: { ...prev.configuration.overlapPolicy, minNewPercent: Number(e.target.value) } } }))}
+                  />
+                </div>
+                <div className="flex gap-2 items-center">
+                  <label className="text-xs w-32">Max Repeat Last</label>
+                  <input 
+                    type="number" 
+                    className="flex-1 rounded-md border border-gray-300 px-2 py-1 text-sm dark:bg-zinc-950 dark:border-zinc-800"
+                    value={form.configuration.overlapPolicy.maxRepeatFromLast}
+                    onChange={e => setForm(prev => ({ ...prev, configuration: { ...prev.configuration, overlapPolicy: { ...prev.configuration.overlapPolicy, maxRepeatFromLast: Number(e.target.value) } } }))}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
         </form>
         </Card>
       )}
@@ -438,6 +559,15 @@ export default function ExamsPage () {
                             price: ex.price ?? '',
                             purchasable: ex.purchasable ?? false,
                             sortOrder: ex.sortOrder ?? '',
+                            imageUrl: ex.imageUrl ?? '',
+                            configuration: {
+                              topicDistribution: ex.configuration?.topicDistribution ?? {},
+                              typeDistribution: ex.configuration?.typeDistribution ?? {},
+                              overlapPolicy: {
+                                minNewPercent: ex.configuration?.overlapPolicy?.minNewPercent ?? 0,
+                                maxRepeatFromLast: ex.configuration?.overlapPolicy?.maxRepeatFromLast ?? 0
+                              }
+                            }
                           })
                           setTab('form')
                         }}

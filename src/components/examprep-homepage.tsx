@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import ExamTile from './exam-tile'
 import { Footer } from './footer'
+import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001/api'
 
@@ -45,6 +46,8 @@ export default function ExamPrepHomepage() {
 	const [error, setError] = useState<string | null>(null)
 	const [showSuggestions, setShowSuggestions] = useState(false)
 	const [suggestions, setSuggestions] = useState<Exam[]>([])
+	const [userPurchases, setUserPurchases] = useState<Record<number, string>>({}) // examId -> expiresAt
+	const supabase = createSupabaseBrowserClient()
 
 	useEffect(() => {
 		const fetchData = async () => {
@@ -52,10 +55,24 @@ export default function ExamPrepHomepage() {
 				setLoading(true)
 				setError(null)
 
-				const [providersRes, examsRes] = await Promise.all([
+				const { data: { session } } = await supabase.auth.getSession()
+				const userId = session?.user?.id
+				const email = session?.user?.email
+
+				const promises: Promise<any>[] = [
 					fetch(`${API_BASE}/providers`),
 					fetch(`${API_BASE}/exams`),
-				])
+				]
+
+				if (userId) {
+					promises.push(fetch(`${API_BASE}/purchases/my-purchases?userId=${userId}&email=${email}`))
+				}
+
+				const responses = await Promise.all(promises)
+				
+				const providersRes = responses[0]
+				const examsRes = responses[1]
+				const purchasesRes = userId ? responses[2] : null
 
 				if (!providersRes.ok || !examsRes.ok) {
 					throw new Error('Failed to fetch data')
@@ -66,6 +83,17 @@ export default function ExamPrepHomepage() {
 
 				setProviders(providersData)
 				setExams(examsData)
+
+				if (purchasesRes && purchasesRes.ok) {
+					const purchasesData = await purchasesRes.json()
+					const purchaseMap: Record<number, string> = {}
+					purchasesData.forEach((p: any) => {
+						if (p.status === 'Active') {
+							purchaseMap[p.examId] = p.expiresAt
+						}
+					})
+					setUserPurchases(purchaseMap)
+				}
 			} catch (err) {
 				console.error('Error fetching data:', err)
 				setError('Failed to load exam data. Please try again later.')
@@ -284,43 +312,7 @@ export default function ExamPrepHomepage() {
 			<main className="max-w-7xl mx-auto px-4 lg:px-8 py-10">
 				<div className="flex flex-col xl:flex-row gap-8">
 					{/* Sidebar */}
-					<aside className="hidden xl:block w-72 flex-shrink-0">
-						<div className="sticky top-40 space-y-6">
-							{/* Quick Filters */}
-							<div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-								<h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
-									<svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path
-											strokeLinecap="round"
-											strokeLinejoin="round"
-											strokeWidth={2}
-											d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
-										/>
-									</svg>
-									Quick Filters
-								</h3>
-								<div className="space-y-2">
-									{['Recently Updated', 'Most Popular', 'Beginner Friendly', 'Advanced Level'].map((filter, i) => (
-										<label key={i} className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 cursor-pointer">
-											<input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-blue-600" />
-											<span className="text-sm text-slate-600">{filter}</span>
-										</label>
-									))}
-								</div>
-							</div>
 
-							{/* Pricing Card */}
-							<div className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl p-5 text-white shadow-lg">
-								<h3 className="font-semibold text-lg mb-2">🎯 Unlimited Access</h3>
-								<p className="text-white/90 text-sm mb-4">
-									Get full access to all practice exams and questions
-								</p>
-								<button className="w-full bg-white text-emerald-600 font-semibold py-2.5 rounded-lg hover:bg-slate-50 transition-colors">
-									View Plans
-								</button>
-							</div>
-						</div>
-					</aside>
 
 					{/* Exam Grid */}
 					<div className="flex-1">
@@ -362,16 +354,18 @@ export default function ExamPrepHomepage() {
 										<p className="text-slate-600">Try adjusting your search or filter criteria</p>
 									</div>
 								) : (
-									<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+									<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
 										{filteredExams.map((exam) => (
 											<ExamTile
 												key={exam.id}
+												examId={exam.id}
 												code={exam.code}
 												title={exam.title}
 												providerName={exam.providerName}
 												totalQuestions={exam.totalQuestionsInBank}
 												imageUrl={exam.imageUrl}
 												hot={isHotExam(exam.code)}
+												expiresAt={userPurchases[exam.id]}
 											/>
 										))}
 									</div>

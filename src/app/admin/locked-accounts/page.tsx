@@ -392,9 +392,24 @@ export default function LockedAccountsPage() {
                         {account.lockReason || 'N/A'}
                       </div>
                     </td>
-                    <td className="py-4 pr-4 text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                      {new Date(account.lockedAt).toLocaleDateString()} <br/>
-                      <span className="text-xs">{new Date(account.lockedAt).toLocaleTimeString()}</span>
+                    <td className="py-4 pr-4 text-gray-600 dark:text-gray-400">
+                      <div className="whitespace-nowrap">
+                        {new Date(account.lockedAt).toLocaleDateString()} <br/>
+                        <span className="text-xs">{new Date(account.lockedAt).toLocaleTimeString()}</span>
+                        {(() => {
+                          const unlockTime = new Date(new Date(account.lockedAt).getTime() + 48 * 60 * 60 * 1000);
+                          const now = new Date();
+                          const hoursRemaining = Math.max(0, Math.floor((unlockTime.getTime() - now.getTime()) / (1000 * 60 * 60)));
+                          if (hoursRemaining > 0) {
+                            return (
+                              <div className="mt-1 text-xs text-blue-600 dark:text-blue-400">
+                                Auto-unlocks in {hoursRemaining}h
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
+                      </div>
                     </td>
                     <td className="py-4">
                       <div className="flex gap-2">

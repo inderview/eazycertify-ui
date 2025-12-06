@@ -35,6 +35,7 @@ export function Sidebar () {
         <NavItem href="/admin/users" label="Users" />
         <NavItem href="/admin/locked-accounts" label="Locked Accounts" />
         <NavItem href="/admin/revenue" label="Revenue" />
+        <NavItem href="/admin/contact-requests" label="Contact Requests" />
         <NavItem href="/admin/settings" label="Settings" />
       </nav>
       <div className="p-3 text-xs text-gray-500 dark:text-gray-400">v1.0</div>

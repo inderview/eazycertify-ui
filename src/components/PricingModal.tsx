@@ -1,10 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { loadStripe } from '@stripe/stripe-js'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
-
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001/api'
 
 interface PricingModalProps {
@@ -28,12 +25,31 @@ export default function PricingModal({ examId, examCode, examTitle, onClose }: P
 
 	const currentPrice = withAI ? pricing[selectedDuration].withAI : pricing[selectedDuration].base
 
+
 	const handleCheckout = async () => {
 		setLoading(true)
-        const { data: { session } } = await supabase.auth.getSession()
-        const userId = session?.user?.id
-
 		try {
+			const { data: { session } } = await supabase.auth.getSession()
+			const userId = session?.user?.id
+
+			if (!userId) {
+				alert('Please sign in to continue with checkout')
+				setLoading(false)
+				return
+			}
+
+			const userEmail = session.user.email ?? undefined
+
+			console.log('Creating checkout session with:', {
+				examId,
+				examCode,
+				examTitle,
+				duration: selectedDuration,
+				withAI,
+				userId,
+				userEmail,
+			})
+
 			const response = await fetch(`${API_BASE}/stripe/create-checkout-session`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -43,16 +59,30 @@ export default function PricingModal({ examId, examCode, examTitle, onClose }: P
 					examTitle,
 					duration: selectedDuration,
 					withAI,
-                    userId,
+					userId,
+					userEmail,
 				}),
 			})
 
-			const { url } = await response.json()
-			window.location.href = url
-		} catch (error) {
+			console.log('Response status:', response.status)
+
+			if (!response.ok) {
+				const errorText = await response.text()
+				console.error('Server error:', errorText)
+				throw new Error(`Server returned ${response.status}: ${errorText}`)
+			}
+
+			const data = await response.json()
+			console.log('Checkout session created:', data)
+
+			if (!data.url) {
+				throw new Error('No checkout URL received from server')
+			}
+
+			window.location.href = data.url
+		} catch (error: any) {
 			console.error('Error creating checkout session:', error)
-			alert('Failed to initiate checkout. Please try again.')
-		} finally {
+			alert(`Failed to initiate checkout: ${error.message}`)
 			setLoading(false)
 		}
 	}
