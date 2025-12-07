@@ -2,6 +2,9 @@ import { createClient } from '@supabase/supabase-js'
 import { notFound } from 'next/navigation'
 import { Header } from '@/components/header'
 import Link from 'next/link'
+import { Metadata } from 'next'
+import { generateSEOMetadata } from '@/components/seo/seo-head'
+import { StructuredData, schemas } from '@/components/seo/structured-data'
 
 // Initialize Supabase client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -40,6 +43,36 @@ async function getQuestionCount(examId: number) {
 	return count || 0
 }
 
+// Generate dynamic metadata for SEO
+export async function generateMetadata({ params }: { params: { code: string } }): Promise<Metadata> {
+	const { code } = await params
+	const exam = await getExam(code)
+
+	if (!exam) {
+		return generateSEOMetadata({
+			title: 'Exam Not Found',
+			description: 'The requested exam could not be found.',
+			noindex: true,
+		})
+	}
+
+	return generateSEOMetadata({
+		title: `${exam.code}: ${exam.title} - Practice Exam & Study Guide`,
+		description: `Master ${exam.code} ${exam.title} with our comprehensive practice exam. Premium questions, detailed explanations, and a 98% pass rate. Start your certification journey today!`,
+		keywords: [
+			exam.code,
+			exam.title,
+			`${exam.code} practice exam`,
+			`${exam.code} certification`,
+			exam.provider?.name || '',
+			'practice test',
+			'exam prep',
+		],
+		canonical: `https://eazycertify.com/exams/${exam.code}/details`,
+		ogImage: exam.imageUrl || 'https://eazycertify.com/og-exam.png',
+	})
+}
+
 export default async function ExamDetailsPage({ params }: { params: { code: string } }) {
 	const { code } = await params
 	const exam = await getExam(code)
@@ -50,8 +83,24 @@ export default async function ExamDetailsPage({ params }: { params: { code: stri
 
 	const questionCount = await getQuestionCount(exam.id)
 
+	// Prepare structured data
+	const breadcrumbItems = [
+		{ name: 'Home', url: 'https://eazycertify.com' },
+		{ name: 'Exams', url: 'https://eazycertify.com/exams' },
+		{ name: exam.code, url: `https://eazycertify.com/exams/${exam.code}/details` },
+	]
+
+	const examData = {
+		...exam,
+		totalQuestionsInBank: questionCount,
+		providerName: exam.provider?.name,
+	}
+
 	return (
 		<div className="min-h-screen bg-slate-50 flex flex-col">
+			<StructuredData data={schemas.breadcrumb(breadcrumbItems)} />
+			<StructuredData data={schemas.course(examData)} />
+			{exam.price && <StructuredData data={schemas.product(examData)} />}
 			<Header />
 
 			{/* Hero Section */}

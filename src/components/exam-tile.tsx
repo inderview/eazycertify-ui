@@ -45,9 +45,10 @@ export default function ExamTile({
 							{imageUrl ? (
 								<Image
 									src={imageUrl}
-									alt={`${code} certification badge`}
+									alt={`${code} ${title} certification badge - ${providerName}`}
 									fill
 									className="object-contain p-4 transition-transform duration-300 group-hover:scale-105"
+									loading="lazy"
 								/>
 							) : (
 								<div className="text-center p-4">

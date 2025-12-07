@@ -5,11 +5,22 @@ import { SearchAndSort } from './components/search-and-sort'
 import { ExamsGrid } from './components/exams-grid'
 import { Header } from '@/components/header'
 import { Footer } from '@/components/footer'
+import { generateSEOMetadata } from '@/components/seo/seo-head'
+import { StructuredData, schemas } from '@/components/seo/structured-data'
 
-export const metadata = {
-  title: 'Exams | EazyCertify',
-  description: 'Browse all certification exams',
-}
+export const metadata = generateSEOMetadata({
+  title: 'All Certification Exams - Practice Tests for Cloud Certifications',
+  description: 'Browse all certification practice exams. Azure, AWS, Google Cloud, Cisco, CompTIA and more. Premium practice tests with detailed explanations and pass guarantees.',
+  keywords: [
+    'certification exams',
+    'practice tests',
+    'azure exam',
+    'aws exam',
+    'google cloud exam',
+    'cloud certification practice',
+  ],
+  canonical: 'https://eazycertify.com/exams',
+})
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001/api'
 
