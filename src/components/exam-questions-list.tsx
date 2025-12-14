@@ -5,6 +5,7 @@ import { MultipleChoiceQuestion } from './questions/multiple-choice-question'
 import { HotspotQuestion } from './questions/hotspot-question'
 import { YesNoQuestion } from './questions/yesno-question'
 import { DragDropQuestion } from './questions/dragdrop-question'
+import { ProgramQuestion } from './questions/program-question'
 
 interface Option {
   id: number
@@ -362,6 +363,19 @@ export default function ExamQuestionsList({ questions, examId, examCode, examTit
               case 'dragdrop':
                 return (
                   <DragDropQuestion 
+                    key={question.id} 
+                    question={question} 
+                    index={globalIndex}
+                    readOnly={readOnly}
+                    isMarked={markedQuestions.has(question.id)}
+                    onToggleMark={() => toggleMarkQuestion(question.id)}
+                    globalExpanded={globalExpanded}
+                    globalRevealed={globalRevealed}
+                  />
+                )
+              case 'program':
+                return (
+                  <ProgramQuestion 
                     key={question.id} 
                     question={question} 
                     index={globalIndex}

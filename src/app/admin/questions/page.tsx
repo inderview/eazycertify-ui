@@ -8,6 +8,7 @@ import { HotspotQuestion } from '@/components/questions/hotspot-question'
 import { MultipleChoiceQuestion } from '@/components/questions/multiple-choice-question'
 import { YesNoQuestion } from '@/components/questions/yesno-question'
 import { DragDropQuestion } from '@/components/questions/dragdrop-question'
+import { ProgramQuestion } from '@/components/questions/program-question'
 
 
 
@@ -20,7 +21,7 @@ type Exam = {
 type Question = {
   id: number
   examId: number
-  type: 'single' | 'multi' | 'ordering' | 'yesno'
+  type: 'single' | 'multi' | 'ordering' | 'yesno' | 'hotspot' | 'dragdrop' | 'program'
   text: string
   topic?: string
   difficulty: 'easy' | 'medium' | 'hard'
@@ -46,7 +47,7 @@ export default function QuestionsPage () {
   // Form
   const [form, setForm] = useState({
     examId: 0,
-    type: 'single' as 'single' | 'multi' | 'ordering' | 'yesno' | 'hotspot' | 'dragdrop',
+    type: 'single' as 'single' | 'multi' | 'ordering' | 'yesno' | 'hotspot' | 'dragdrop' | 'program',
     text: '',
     topic: '',
     difficulty: 'easy' as 'easy' | 'medium' | 'hard',
@@ -57,7 +58,7 @@ export default function QuestionsPage () {
     referenceUrl: '',
     attachments: '',
     options: [{ text: '', isCorrect: true }] as { text: string, isCorrect: boolean, targetIndex?: number }[],
-    groups: [] as { label: string, mode: 'single' | 'multi', options: { text: string, isCorrect: boolean }[] }[],
+    groups: [] as { label: string, mode: 'single' | 'multi', slotType?: 'text' | 'select', options: { text: string, isCorrect: boolean }[] }[],
   })
 
   const token = useMemo(() => (typeof window !== 'undefined' ? localStorage.getItem('adminToken') ?? '' : ''), [])
@@ -101,25 +102,26 @@ export default function QuestionsPage () {
       blockId: form.blockId ? Number(form.blockId) : undefined,
     }
 
-    if (form.type === 'dragdrop') {
+    if (form.type === 'dragdrop' || form.type === 'program') {
 
       if (form.options.some(o => !o.text || !o.text.trim())) {
-        return setError('All features must have text.')
+        return setError('All draggable items must have text.')
       }
-      // DragDrop: Map flat options to groups or global, preserving global order
+      // DragDrop/Program: Map flat options to groups or global, preserving global order
       const optionsWithOrder = form.options.map((o, i) => ({ ...o, globalOrder: i + 1 }))
 
       payload.groups = form.groups.map((g, gi) => ({
         label: g.label,
         mode: g.mode,
+        slotType: g.slotType ?? 'text',
         groupOrder: gi + 1,
         options: optionsWithOrder
           .filter(o => o.targetIndex === gi)
-          .map(o => ({ text: o.text, isCorrect: true, optionOrder: o.globalOrder }))
+          .map(o => ({ text: o.text, isCorrect: o.isCorrect ?? true, optionOrder: o.globalOrder }))
       }))
       payload.options = optionsWithOrder
         .filter(o => o.targetIndex === undefined || o.targetIndex === -1)
-        .map(o => ({ text: o.text, isCorrect: false, optionOrder: o.globalOrder }))
+        .map(o => ({ text: o.text, isCorrect: o.isCorrect ?? false, optionOrder: o.globalOrder }))
     } else if (form.type === 'hotspot' || form.type === 'yesno') {
       // Hotspot/YesNo: Use nested groups directly
       payload.groups = form.groups.map((g, gi) => ({
@@ -189,13 +191,13 @@ export default function QuestionsPage () {
       explanation: q.explanation ?? '',
       referenceUrl: q.referenceUrl ?? '',
       attachments: q.attachments ?? '',
-      options: q.type === 'dragdrop'
+      options: q.type === 'dragdrop' || q.type === 'program'
         ? [
             ...(data.groups?.flatMap((g: any, gi: number) => g.options.map((o: any) => ({ text: o.text, isCorrect: true, targetIndex: gi }))) || []),
             ...(data.options?.map((o: any) => ({ text: o.text, isCorrect: false, targetIndex: -1 })) || [])
           ]
         : data.options?.map((o: any) => ({ text: o.text, isCorrect: o.isCorrect })) ?? [{ text: '', isCorrect: true }],
-      groups: data.groups?.map((g: any) => ({ label: g.label, mode: g.mode, options: g.options.map((o: any) => ({ text: o.text, isCorrect: o.isCorrect })) })) ?? [],
+      groups: data.groups?.map((g: any) => ({ label: g.label, mode: g.mode, slotType: g.slotType ?? 'text', options: g.options.map((o: any) => ({ text: o.text, isCorrect: o.isCorrect })) })) ?? [],
     })
     setEditingId(id)
     setTab('form')
@@ -315,6 +317,7 @@ export default function QuestionsPage () {
                 <option value="yesno">Yes/No (Multi-part)</option>
                 <option value="hotspot">Hotspot (Grouped picks)</option>
                 <option value="dragdrop">Drag & Drop (Matching)</option>
+                <option value="program">Drag & Drop to Program</option>
               </select>
             </div>
             <div className="flex flex-col gap-1">
@@ -384,12 +387,12 @@ export default function QuestionsPage () {
 
 
             {/* DragDrop UI */}
-            {form.type === 'dragdrop' && (
+      {(form.type === 'dragdrop' || form.type === 'program') && (
               <>
                 <div className="md:col-span-6">
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-xs font-medium">Targets (Answer Area)</label>
-                    <button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => setForm(prev => ({ ...prev, groups: [...prev.groups, { label: '', mode: 'single', options: [] }] }))}>Add Target</button>
+                    <button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => setForm(prev => ({ ...prev, groups: [...prev.groups, { label: '', mode: 'single', slotType: 'text', options: [] }] }))}>Add Target</button>
                   </div>
                   <div className="space-y-2">
                     {form.groups.map((g, gi) => (
@@ -397,6 +400,16 @@ export default function QuestionsPage () {
                         <input className="flex-1 rounded-md border px-3 py-2 text-sm" placeholder={`Target ${gi + 1}`} value={g.label} onChange={e => setForm(prev => {
                           const next = [...prev.groups]; next[gi].label = e.target.value; return { ...prev, groups: next }
                         })} />
+                        <select
+                          className="rounded-md border px-2 py-1 text-xs"
+                          value={g.slotType ?? 'text'}
+                          onChange={e => setForm(prev => {
+                            const next = [...prev.groups]; next[gi].slotType = e.target.value as any; return { ...prev, groups: next }
+                          })}
+                        >
+                          <option value="text">Textbox</option>
+                          <option value="select">Dropdown</option>
+                        </select>
                         <button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => setForm(prev => ({ ...prev, groups: prev.groups.filter((_, i) => i !== gi) }))}>Remove</button>
                       </div>
                     ))}
@@ -431,6 +444,21 @@ export default function QuestionsPage () {
                             <option key={gi} value={gi}>Matches: {g.label || `Target ${gi+1}`}</option>
                           ))}
                         </select>
+                        <label className="text-xs inline-flex items-center gap-1">
+                          <input
+                            type="checkbox"
+                            checked={opt.isCorrect}
+                            onChange={e => setForm(prev => {
+                              const next = [...prev.options]
+                              next[idx].isCorrect = e.target.checked
+                              if (e.target.checked && (next[idx].targetIndex === undefined || next[idx].targetIndex === -1) && prev.groups.length > 0) {
+                                next[idx].targetIndex = 0
+                              }
+                              return { ...prev, options: next }
+                            })}
+                          />
+                          Correct
+                        </label>
                         <button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => setForm(prev => ({ ...prev, options: prev.options.filter((_, i) => i !== idx) }))}>Remove</button>
                       </div>
                     ))}
@@ -554,7 +582,7 @@ export default function QuestionsPage () {
             )}
 
             {/* Standard Options UI */}
-            {(form.type !== 'hotspot' && form.type !== 'dragdrop' && form.type !== 'yesno') && (
+            {(form.type !== 'hotspot' && form.type !== 'dragdrop' && form.type !== 'yesno' && form.type !== 'program') && (
               <div className="md:col-span-6">
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-xs font-medium">
@@ -676,6 +704,11 @@ function Preview ({ open, data, onClose }: { open: boolean, data: any, onClose: 
             />
           ) : q.type === 'dragdrop' ? (
             <DragDropQuestion 
+              question={questionData} 
+              index={1} 
+            />
+          ) : q.type === 'program' ? (
+            <ProgramQuestion 
               question={questionData} 
               index={1} 
             />
