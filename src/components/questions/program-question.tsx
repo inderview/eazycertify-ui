@@ -165,12 +165,31 @@ export function ProgramQuestion({
 
   const slotHasOptions = useCallback((groupId: number) => (optionsByGroup[groupId] || []).length > 0, [optionsByGroup])
 
+  const slotMarkers = useMemo(() => {
+    const markers: Array<{ isSelect: boolean }> = []
+    const regex = /\[slot(?:\s*(\d+))?(?::(select|dropdown|combo))?\]/gi
+    let autoIndex = 0
+    let match: RegExpExecArray | null
+    while ((match = regex.exec(stemAndCode.code)) !== null) {
+      const slotNumber = match[1] ? Number(match[1]) : (++autoIndex)
+      const group = sortedGroups[slotNumber - 1]
+      const markerSelect = !!match[2]
+      const groupSelect = (group?.slotType ?? 'text') === 'select'
+      markers.push({ isSelect: markerSelect || groupSelect })
+    }
+    // If no markers were found, fall back to group definitions
+    if (markers.length === 0 && sortedGroups.length > 0) {
+      sortedGroups.forEach(g => {
+        markers.push({ isSelect: (g.slotType ?? 'text') === 'select' })
+      })
+    }
+    return markers
+  }, [sortedGroups, stemAndCode.code])
+
   const showValuesPanel = useMemo(() => {
-    if (sortedGroups.length === 0) return allOptions.length > 0
-    const allDropdowns = sortedGroups.every(g => (g.slotType ?? 'text') === 'select' && slotHasOptions(g.id))
-    if (allDropdowns) return false
+    if (slotMarkers.length > 0 && slotMarkers.every(m => m.isSelect)) return false
     return allOptions.length > 0
-  }, [allOptions.length, slotHasOptions, sortedGroups])
+  }, [allOptions.length, slotMarkers])
 
   const renderCodeWithSlots = () => {
     const nodes: Array<JSX.Element | string> = []
